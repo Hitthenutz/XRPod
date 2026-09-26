@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --background: 222 47% 4%;
+    --foreground: 210 40% 96%;
+    --primary: 199 89% 60%;
+    --primary-foreground: 222 47% 8%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 63% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 215 20% 65%;
+    --radius: 0.75rem;
+  }
+  * {
+    @apply border-border;
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Big, touch-friendly range slider with a filled track. Kept outside
+   @layer so Tailwind doesn't purge the dynamically-built modifier classes. */
+.hud-range {
+  --thumb: theme(colors.sky.400);
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2.25rem; /* tall hit area for fingers */
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+.hud-range--orange { --thumb: theme(colors.orange.400); }
+.hud-range--teal { --thumb: theme(colors.teal.400); }
+.hud-range--violet { --thumb: theme(colors.violet.400); }
+.hud-range:disabled { cursor: not-allowed; }
+.hud-range:focus-visible { outline: none; }
+
+.hud-range::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(
+    to right,
+    var(--thumb) 0 var(--fill),
+    theme(colors.slate.700) var(--fill) 100%
+  );
+}
+.hud-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: theme(colors.slate.700);
+}
+.hud-range::-moz-range-progress {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--thumb);
+}
+.hud-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -0.625rem; /* center on the 0.5rem track */
+  height: 1.75rem;
+  width: 1.75rem;
+  border-radius: 9999px;
+  background: theme(colors.slate.50);
+  border: 3px solid var(--thumb);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
+}
+.hud-range::-moz-range-thumb {
+  height: 1.5rem;
+  width: 1.5rem;
+  border-radius: 9999px;
+  background: theme(colors.slate.50);
+  border: 3px solid var(--thumb);
+}
+.hud-range:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgb(148 163 184 / 0.4);
+}
+.hud-range:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgb(148 163 184 / 0.4);
+}

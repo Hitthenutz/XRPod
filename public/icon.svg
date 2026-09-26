@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#020617"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#1e293b" stroke-width="36"/>
+  <path d="M256 106 A150 150 0 1 1 126 331" fill="none" stroke="#38bdf8" stroke-width="36" stroke-linecap="round"/>
+  <text x="256" y="292" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="104" font-weight="700" fill="#f8fafc">XR</text>
+</svg>
