@@ -1,0 +1,60 @@
+// The single current desired-state record. The HUD writes it; the Pi agent
+// reads it and drives the hardware to match.
+{
+  "name": "PodSettings",
+  "type": "object",
+  "properties": {
+    "target_temp_f": {
+      "type": "number",
+      "minimum": 50,
+      "maximum": 95,
+      "default": 72,
+      "description": "Target cabin temperature (°F)"
+    },
+    "target_humidity_pct": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 45,
+      "description": "Target relative humidity (%)"
+    },
+    "fan_speed_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "Fan duty cycle (%)"
+    },
+    "ac_on": {
+      "type": "boolean",
+      "default": false,
+      "description": "AC relay requested on"
+    },
+    "heater_on": {
+      "type": "boolean",
+      "default": false,
+      "description": "Heater relay requested on"
+    },
+    "selected_scent": {
+      "type": "string",
+      "enum": ["none", "lavender", "pine", "citrus", "ocean", "rain"],
+      "default": "none",
+      "description": "Active scent cartridge"
+    },
+    "scent_intensity_pct": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50,
+      "description": "Scent diffuser intensity (%)"
+    }
+  },
+  "required": [],
+  // No auth yet: anyone can create/read/update; only admins can delete.
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": true,
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}

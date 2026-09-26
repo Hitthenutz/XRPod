@@ -1,0 +1,45 @@
+// Time-stamped actual readings pushed by the Pi agent through the
+// push-sensor-reading function. Use created_date as the reading timestamp.
+{
+  "name": "SensorReading",
+  "type": "object",
+  "properties": {
+    "actual_temp_f": {
+      "type": "number",
+      "description": "Measured cabin temperature (°F)"
+    },
+    "actual_humidity_pct": {
+      "type": "number",
+      "description": "Measured relative humidity (%)"
+    },
+    "ac_running": {
+      "type": "boolean",
+      "description": "AC relay is actually energized"
+    },
+    "heater_running": {
+      "type": "boolean",
+      "description": "Heater relay is actually energized"
+    },
+    "fan_rpm": {
+      "type": "number",
+      "description": "Measured fan speed (RPM)"
+    },
+    "scent_active": {
+      "type": "string",
+      "description": "Scent currently being diffused"
+    },
+    "reading_source": {
+      "type": "string",
+      "default": "pi-agent",
+      "description": "Who produced the reading"
+    }
+  },
+  "required": ["actual_temp_f", "actual_humidity_pct"],
+  // Readings are append-only: open create/read, no updates, admin-only delete.
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": false,
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}

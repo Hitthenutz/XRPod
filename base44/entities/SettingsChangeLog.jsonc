@@ -1,0 +1,31 @@
+// One record per PodSettings field change made from the HUD.
+{
+  "name": "SettingsChangeLog",
+  "type": "object",
+  "properties": {
+    "field_name": {
+      "type": "string",
+      "description": "Which PodSettings field changed"
+    },
+    "old_value": {
+      "type": "string",
+      "description": "Previous value, stringified"
+    },
+    "new_value": {
+      "type": "string",
+      "description": "New value, stringified"
+    },
+    "changed_by": {
+      "type": "string",
+      "description": "Email of whoever made the change, if available"
+    }
+  },
+  "required": ["field_name", "new_value"],
+  // Append-only audit log: open create/read, no updates, admin-only delete.
+  "rls": {
+    "create": true,
+    "read": true,
+    "update": false,
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}
