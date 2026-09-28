@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Blocks PRs that add dependencies with known high/critical vulnerabilities.
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
 
