@@ -9,7 +9,9 @@ Raspberry Pi. See README.md for setup, deploy and how the pieces fit together.
 - `base44/entities/*.jsonc`: data schemas and access rules (RLS)
 - `base44/functions/push-sensor-reading/`: Deno function the Pi calls
 - `src/`: the HUD (`App.jsx`, `components/`, `hooks/`, `lib/`)
-- `pi-agent/agent.py`: runs on the Pi, stdlib-only, not part of the web build
+- `pi-agent/agent.py`: runs on the Pi 4, stdlib-only, not part of the web build
+- `esp32-scent/esp32-scent.ino`: ESP32 scent mixer firmware; the Pi talks to
+  it over serial (`MIX`/`OFF`/`PING` → `OK`/`ERR`)
 - `.github/workflows/`: `build.yml` (build check) and `security.yml`
 
 ## Commands
@@ -45,7 +47,8 @@ base44 deploy --build # full deploy
   `apply_settings()` on the Pi.
 - If you change a PodSettings field or default, update it in all three places:
   `base44/entities/PodSettings.jsonc`, `src/lib/podSettings.js` and
-  `DEFAULT_SETTINGS` in `pi-agent/agent.py`.
+  `DEFAULT_SETTINGS` in `pi-agent/agent.py`. The scent list also lives in
+  `SCENTS` in `agent.py` and `SCENT_NAMES` in the ESP32 sketch.
 
 ## Security rules
 
@@ -66,7 +69,8 @@ base44 deploy --build # full deploy
 - **The Pi agent must fail safe.** On errors it keeps the last applied state,
   and on exit it turns every output off. Never let a bad value from the
   network drive the hardware: clamp percentages to 0–100 and never run the
-  heater and AC together.
+  heater and AC together. The ESP32 must keep its no-command watchdog that
+  turns every diffuser off.
 - **Don't weaken CI to get green.** Don't disable or skip the checks in
   `security.yml` (npm audit, dependency review, gitleaks, CodeQL); fix the
   finding. New dependencies must not have high/critical vulnerabilities.

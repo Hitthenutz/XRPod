@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
 export function timeAgo(date, now = Date.now()) {
-  if (!date) return "";
-  const seconds = Math.max(0, Math.round((now - new Date(date).getTime()) / 1000));
+  const then = date ? new Date(date).getTime() : NaN;
+  if (!Number.isFinite(then)) return "";
+  const seconds = Math.max(0, Math.round((now - then) / 1000));
   if (seconds < 5) return "just now";
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);

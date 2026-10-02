@@ -7,7 +7,7 @@ import { timeAgo, useNow } from "@/lib/time";
 
 export function HistoryPanel() {
   const [open, setOpen] = useState(true);
-  const { entries, loading } = useChangeLog(50);
+  const { entries, loading, error } = useChangeLog(50);
   const now = useNow(15000);
 
   return (
@@ -31,6 +31,10 @@ export function HistoryPanel() {
         <div id="history-list">
           {loading ? (
             <p className="py-6 text-center text-sm text-slate-500">Loading…</p>
+          ) : error && entries.length === 0 ? (
+            <p role="alert" className="py-6 text-center text-sm text-red-300">
+              Couldn’t load history. New changes will still show up here.
+            </p>
           ) : entries.length === 0 ? (
             <p className="py-6 text-center text-sm text-slate-500">No changes yet.</p>
           ) : (

@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { AirflowCard } from "@/components/AirflowCard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ReadoutsPanel } from "@/components/ReadoutsPanel";
 import { ScentCard } from "@/components/ScentCard";
@@ -9,7 +10,7 @@ import { usePodSettings } from "@/hooks/usePodSettings";
 
 export default function App() {
   const { settings, applyChanges, error, saving } = usePodSettings();
-  const { reading, loading: readingLoading } = useLatestReading();
+  const { reading, loading: readingLoading, error: readingError } = useLatestReading();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -38,18 +39,28 @@ export default function App() {
             className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Couldn’t reach the pod settings. {error.message ?? String(error)}</span>
+            <span>{error.message ?? String(error)}</span>
           </div>
         )}
 
-        <ReadoutsPanel reading={reading} loading={readingLoading} />
+        <ErrorBoundary label="Live readouts">
+          <ReadoutsPanel reading={reading} loading={readingLoading} error={readingError} />
+        </ErrorBoundary>
 
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TemperatureCard settings={settings} onChange={applyChanges} />
-            <AirflowCard settings={settings} onChange={applyChanges} />
-            <ScentCard settings={settings} onChange={applyChanges} />
-            <HistoryPanel />
+            <ErrorBoundary label="Temperature controls">
+              <TemperatureCard settings={settings} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Airflow controls">
+              <AirflowCard settings={settings} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Scent controls">
+              <ScentCard settings={settings} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="History">
+              <HistoryPanel />
+            </ErrorBoundary>
           </div>
         ) : (
           !error && (

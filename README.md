@@ -31,6 +31,7 @@ src/
 └── lib/                               # Field defaults/labels, relative time
 public/                                # PWA manifest + home-screen icons
 pi-agent/agent.py                      # Runs on the Pi (not part of the web build)
+esp32-scent/esp32-scent.ino            # ESP32 scent mixer firmware, driven by the Pi
 ```
 
 ## How it works
@@ -116,18 +117,42 @@ Check the function's logs with `base44 logs --function push-sensor-reading`.
 
 ## Raspberry Pi agent
 
-`pi-agent/agent.py` uses only the Python standard library. Copy it to the Pi,
-fill in the placeholders described at the top of the file (`APP_DOMAIN`,
-`APP_ID`, `PI_AGENT_KEY`, and the real sensor/relay/PWM code), then run:
+`pi-agent/agent.py` (Raspberry Pi 4) uses only the Python standard library.
+Copy it to the Pi, fill in the placeholders described at the top of the file
+(`APP_DOMAIN`, `APP_ID`, `PI_AGENT_KEY`, and the real sensor/relay/PWM code),
+then run:
 
 ```bash
-APP_DOMAIN=your-app.base44.app APP_ID=your_app_id PI_AGENT_KEY=... python3 agent.py
+APP_DOMAIN=your-app.base44.app APP_ID=your_app_id PI_AGENT_KEY=... \
+ESP32_PORT=/dev/ttyUSB0 python3 agent.py
 ```
 
-Every 3 seconds it reads the sensors, POSTs to
+Every 3 seconds (`POLL_SECONDS`, 1–5) it reads the sensors, POSTs to
 `https://APP_DOMAIN/functions/push-sensor-reading`, fetches PodSettings, and
 applies it to the hardware. Until then the sensor and actuator code is stubbed
 with fake values, so you can test the whole loop before the hardware is wired.
+Leave `ESP32_PORT` unset to stub the scent mixer too.
+
+It refuses to start with placeholder config. Settings from the network are
+sanitized (only a real `true` turns a relay on, percentages clamped to 0–100,
+heater and AC never together). If the backend is unreachable it keeps the last
+settings. On Ctrl+C, `systemctl stop` (SIGTERM) or a crash it turns every
+output off.
+
+## ESP32 scent mixer
+
+`esp32-scent/esp32-scent.ino` runs on an ESP32 that drives one PWM output per
+scent cartridge. Set the GPIO pins in `SCENT_PINS`, then flash it with the
+Arduino IDE or `arduino-cli` (ESP32 core 2.x or 3.x). Connect it to the Pi by
+USB (`/dev/ttyUSB0` or `/dev/ttyACM0`) or the GPIO UART (`/dev/serial0`, with
+serial console disabled in `raspi-config`), and set `ESP32_PORT` to match. The
+Pi user needs to be in the `dialout` group.
+
+The Pi sends the full mix every cycle (`MIX lavender=0 pine=40 …`) and the
+ESP32 answers `OK` or `ERR <reason>`. The ESP32 validates a whole command
+before applying it. It turns everything off if it hears nothing for 10 seconds,
+so a dead Pi or unplugged cable fails safe. If the link drops, the Pi keeps
+running the rest of the pod and reconnects every 10 seconds.
 
 Quick test of the function from any machine:
 

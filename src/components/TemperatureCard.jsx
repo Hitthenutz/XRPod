@@ -2,6 +2,7 @@ import { Flame, Snowflake, Thermometer } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Slider } from "@/components/ui/Slider";
 import { Toggle } from "@/components/ui/Toggle";
+import { TEMP_RANGE_F } from "@/lib/podSettings";
 
 export function TemperatureCard({ settings, onChange }) {
   return (
@@ -10,8 +11,8 @@ export function TemperatureCard({ settings, onChange }) {
         <Slider
           label="Target temperature"
           value={settings.target_temp_f}
-          min={50}
-          max={95}
+          min={TEMP_RANGE_F.min}
+          max={TEMP_RANGE_F.max}
           unit="°F"
           accent="orange"
           onCommit={(v) => onChange({ target_temp_f: v })}

@@ -6,8 +6,13 @@ const isClearAccessTokenRequested = () =>
 	!isNode && new URLSearchParams(window.location.search).get("clear_access_token") === 'true';
 
 const clearStoredAccessToken = () => {
-	window.localStorage.removeItem('base44_access_token');
-	window.localStorage.removeItem('token');
+	try {
+		window.localStorage.removeItem('base44_access_token');
+		window.localStorage.removeItem('token');
+	} catch (err) {
+		// Storage can be blocked (private mode, site data disabled).
+		console.warn('Could not clear stored access token:', err);
+	}
 }
 
 const getAppParams = () => {

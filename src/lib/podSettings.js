@@ -1,4 +1,9 @@
+// Mirrors the enum in base44/entities/PodSettings.jsonc, SCENTS in
+// pi-agent/agent.py and SCENT_NAMES in esp32-scent/esp32-scent.ino.
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
+
+// Mirrors minimum/maximum of target_temp_f in PodSettings.jsonc.
+export const TEMP_RANGE_F = { min: 50, max: 95 };
 
 // Mirrors the defaults in base44/entities/PodSettings.jsonc.
 export const DEFAULT_SETTINGS = {

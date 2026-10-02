@@ -45,9 +45,10 @@ function RunningPill({ icon: Icon, label, running, color }) {
 const fmt = (n, digits = 1) =>
   typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "--";
 
-export function ReadoutsPanel({ reading, loading }) {
+export function ReadoutsPanel({ reading, loading, error }) {
   const now = useNow(5000);
-  const lastAt = reading?.created_date ? new Date(reading.created_date).getTime() : null;
+  const parsed = reading?.created_date ? new Date(reading.created_date).getTime() : NaN;
+  const lastAt = Number.isFinite(parsed) ? parsed : null;
   const stale = !lastAt || now - lastAt > STALE_AFTER_MS;
 
   return (
@@ -66,7 +67,9 @@ export function ReadoutsPanel({ reading, loading }) {
             ? "Connecting…"
             : lastAt
               ? `${stale ? "Stale · " : ""}updated ${timeAgo(lastAt, now)}`
-              : "No readings yet"}
+              : error
+                ? "Couldn’t load readings"
+                : "No readings yet"}
         </span>
       </div>
 
@@ -94,7 +97,7 @@ export function ReadoutsPanel({ reading, loading }) {
             Fan
           </span>
           <span className="font-mono text-sm tabular-nums text-slate-200">
-            {typeof reading?.fan_rpm === "number" ? `${Math.round(reading.fan_rpm)} rpm` : "--"}
+            {Number.isFinite(reading?.fan_rpm) ? `${Math.round(reading.fan_rpm)} rpm` : "--"}
           </span>
         </div>
       </div>
