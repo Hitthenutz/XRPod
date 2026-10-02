@@ -1,9 +1,18 @@
 import { useEffect, useId, useRef, useState } from "react";
 
+// Width of the thumb in index.css (1.75rem); the value maps across the track
+// minus half a thumb at each end, like the native control.
+const THUMB_PX = 28;
+
 /**
  * Range slider that shows its value live while dragging and calls
- * `onCommit` once when the user lets go (pointer up / key up / blur), so a
- * drag produces one write and one history entry rather than dozens.
+ * `onCommit` once when the user lets go, so a drag produces one write and
+ * one history entry rather than dozens.
+ *
+ * Pointer dragging is handled here rather than by the browser: the pointer
+ * is captured on press and the value is computed from its X position, so the
+ * thumb follows the mouse/finger exactly and the drag can't be cancelled by
+ * the page scrolling. Keyboard input still uses the native control.
  */
 export function Slider({
   label,
@@ -18,35 +27,71 @@ export function Slider({
 }) {
   const id = useId();
   const [draft, setDraft] = useState(value);
+  const draftRef = useRef(value);
   const dragging = useRef(false);
-
-  // Follow external updates (other devices) unless the user is mid-drag.
-  useEffect(() => {
-    if (!dragging.current) setDraft(value);
-  }, [value]);
-
   const inputRef = useRef(null);
   const latest = useRef({ value, onCommit });
   latest.current = { value, onCommit };
 
-  // Read the value off the element rather than from state, so a commit that
-  // fires in the same tick as the last input event still sees it.
-  const commit = () => {
-    dragging.current = false;
-    const next = Number(inputRef.current.value);
-    if (next !== latest.current.value) latest.current.onCommit(next);
+  const show = (next) => {
+    draftRef.current = next;
+    setDraft(next);
   };
 
-  // The native `change` event fires once on release (React's onChange is
-  // really `input`). Duplicate commits are harmless: applyChanges ignores
-  // values that match the current state.
+  // Follow external updates (other devices) unless the user is mid-drag.
+  useEffect(() => {
+    if (!dragging.current) show(value);
+  }, [value]);
+
+  const commit = (next = draftRef.current) => {
+    dragging.current = false;
+    if (Number.isFinite(next) && next !== latest.current.value) {
+      latest.current.onCommit(next);
+    }
+  };
+
+  const valueAt = (clientX) => {
+    const rect = inputRef.current.getBoundingClientRect();
+    const usable = Math.max(1, rect.width - THUMB_PX);
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left - THUMB_PX / 2) / usable));
+    const stepped = Math.round((ratio * (max - min)) / step) * step + min;
+    return Math.min(max, Math.max(min, Number(stepped.toFixed(6))));
+  };
+
+  const onPointerDown = (e) => {
+    if (disabled || (e.pointerType === "mouse" && e.button !== 0)) return;
+    e.preventDefault(); // stop the browser's own drag handling
+    const el = inputRef.current;
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      /* pointer already gone; the drag simply won't be captured */
+    }
+    el.focus({ preventScroll: true });
+    dragging.current = true;
+    show(valueAt(e.clientX));
+  };
+
+  const onPointerMove = (e) => {
+    if (dragging.current) show(valueAt(e.clientX));
+  };
+
+  // Release, cancel and lost capture all end the drag; save where it stopped
+  // so the slider never stays stuck in "dragging" and ignoring updates.
+  const endDrag = () => {
+    if (dragging.current) commit();
+  };
+
+  // Keyboard (arrows, Home/End, PageUp/Down) goes through the native
+  // `change` event, which fires once the value is set.
   useEffect(() => {
     const el = inputRef.current;
-    el.addEventListener("change", commit);
-    return () => el.removeEventListener("change", commit);
+    const onNativeChange = () => commit(Number(el.value));
+    el.addEventListener("change", onNativeChange);
+    return () => el.removeEventListener("change", onNativeChange);
   }, []);
 
-  const pct = ((draft - min) / (max - min)) * 100;
+  const pct = max > min ? ((draft - min) / (max - min)) * 100 : 0;
 
   return (
     <div className={disabled ? "opacity-50" : ""}>
@@ -69,12 +114,14 @@ export function Slider({
         value={draft}
         disabled={disabled}
         onChange={(e) => {
-          dragging.current = true;
-          setDraft(Number(e.target.value));
+          if (!dragging.current) show(Number(e.target.value));
         }}
-        onPointerUp={commit}
-        onKeyUp={commit}
-        onBlur={() => dragging.current && commit()}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
+        onKeyUp={() => commit(Number(inputRef.current.value))}
         className={`hud-range hud-range--${accent}`}
         style={{ "--fill": `${pct}%` }}
       />

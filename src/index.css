@@ -44,7 +44,9 @@
   height: 2.25rem; /* tall hit area for fingers */
   background: transparent;
   cursor: pointer;
-  touch-action: pan-y;
+  /* Slider.jsx handles the drag itself; don't let a slightly diagonal
+     finger drag turn into a page scroll and cancel it. */
+  touch-action: none;
 }
 .hud-range--orange { --thumb: theme(colors.orange.400); }
 .hud-range--teal { --thumb: theme(colors.teal.400); }
@@ -74,6 +76,7 @@
 .hud-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
+  box-sizing: border-box; /* 1.75rem including border; Slider.jsx assumes it */
   margin-top: -0.625rem; /* center on the 0.5rem track */
   height: 1.75rem;
   width: 1.75rem;
@@ -83,8 +86,9 @@
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
 }
 .hud-range::-moz-range-thumb {
-  height: 1.5rem;
-  width: 1.5rem;
+  box-sizing: border-box; /* same 1.75rem as WebKit; Slider.jsx assumes it */
+  height: 1.75rem;
+  width: 1.75rem;
   border-radius: 9999px;
   background: theme(colors.slate.50);
   border: 3px solid var(--thumb);
