@@ -27,6 +27,11 @@ function safeEqual(a: string, b: string): boolean {
 const isNumber = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
 
+// Short labels only; anything longer is junk or abuse, not a scent name.
+const MAX_STRING_LENGTH = 64;
+const isShortString = (v: unknown): v is string =>
+  typeof v === "string" && v.length <= MAX_STRING_LENGTH;
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
@@ -65,15 +70,16 @@ export default async function handler(req: Request): Promise<Response> {
   const reading: Record<string, unknown> = {
     actual_temp_f: body.actual_temp_f,
     actual_humidity_pct: body.actual_humidity_pct,
-    reading_source:
-      typeof body.reading_source === "string" ? body.reading_source : "pi-agent",
+    reading_source: isShortString(body.reading_source)
+      ? body.reading_source
+      : "pi-agent",
   };
   if (typeof body.ac_running === "boolean") reading.ac_running = body.ac_running;
   if (typeof body.heater_running === "boolean") {
     reading.heater_running = body.heater_running;
   }
   if (isNumber(body.fan_rpm)) reading.fan_rpm = body.fan_rpm;
-  if (typeof body.scent_active === "string") {
+  if (isShortString(body.scent_active)) {
     reading.scent_active = body.scent_active;
   }
 

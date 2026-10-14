@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+/* Theme colors (border, background, …) still come from the v3-style config. */
+@config "../tailwind.config.js";
 
 @layer base {
   :root {
@@ -28,6 +28,11 @@
   html {
     -webkit-tap-highlight-color: transparent;
   }
+  /* Tailwind 4 dropped the pointer cursor on buttons; keep it. */
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     overscroll-behavior-y: none;
@@ -37,7 +42,7 @@
 /* Big, touch-friendly range slider with a filled track. Kept outside
    @layer so Tailwind doesn't purge the dynamically-built modifier classes. */
 .hud-range {
-  --thumb: theme(colors.sky.400);
+  --thumb: var(--color-sky-400);
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -46,9 +51,9 @@
   cursor: pointer;
   touch-action: pan-y;
 }
-.hud-range--orange { --thumb: theme(colors.orange.400); }
-.hud-range--teal { --thumb: theme(colors.teal.400); }
-.hud-range--violet { --thumb: theme(colors.violet.400); }
+.hud-range--orange { --thumb: var(--color-orange-400); }
+.hud-range--teal { --thumb: var(--color-teal-400); }
+.hud-range--violet { --thumb: var(--color-violet-400); }
 .hud-range:disabled { cursor: not-allowed; }
 .hud-range:focus-visible { outline: none; }
 
@@ -58,13 +63,13 @@
   background: linear-gradient(
     to right,
     var(--thumb) 0 var(--fill),
-    theme(colors.slate.700) var(--fill) 100%
+    var(--color-slate-700) var(--fill) 100%
   );
 }
 .hud-range::-moz-range-track {
   height: 0.5rem;
   border-radius: 9999px;
-  background: theme(colors.slate.700);
+  background: var(--color-slate-700);
 }
 .hud-range::-moz-range-progress {
   height: 0.5rem;
@@ -78,7 +83,7 @@
   height: 1.75rem;
   width: 1.75rem;
   border-radius: 9999px;
-  background: theme(colors.slate.50);
+  background: var(--color-slate-50);
   border: 3px solid var(--thumb);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.5);
 }
@@ -86,7 +91,7 @@
   height: 1.5rem;
   width: 1.5rem;
   border-radius: 9999px;
-  background: theme(colors.slate.50);
+  background: var(--color-slate-50);
   border: 3px solid var(--thumb);
 }
 .hud-range:focus-visible::-webkit-slider-thumb {
