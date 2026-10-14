@@ -1,0 +1,32 @@
+# systemd service: starts the XRPod controller + HUD on boot and restarts it
+# if it crashes. Install on the Pi (see README "Run it on the Pi"):
+#
+#   sudo cp pi-agent/xrpod.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now xrpod
+#   journalctl -u xrpod -f          # live logs
+#
+# Change User and the /home/pi/XRPod paths if your Pi username or clone
+# location differ.
+
+[Unit]
+Description=XRPod pod controller and HUD
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/XRPod
+ExecStart=/usr/bin/python3 /home/pi/XRPod/pi-agent/agent.py
+Restart=on-failure
+RestartSec=3
+
+# Serve on port 80 so phones can just open http://xrpod.local
+Environment=HUD_PORT=80
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Uncomment once the scent machine is wired up:
+# Environment=SCENT_HARDWARE=gpio
+
+[Install]
+WantedBy=multi-user.target

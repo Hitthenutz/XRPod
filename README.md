@@ -1,153 +1,124 @@
 # XRPod
 
-Manual control HUD for the XRPod senior design capstone pod. A Base44 web app
-(Vite + React + Tailwind, from the Base44 `backend-and-client` template) plus a
-small Python agent that runs on the pod's Raspberry Pi.
+Manual control HUD for the XRPod senior design capstone pod. The Raspberry Pi
+5 does everything: it hosts the HUD website, stores the data and drives the
+hardware. There are no cloud accounts, no usage limits and no internet
+required.
 
 ```
- phone / tablet / laptop                 Base44                         Raspberry Pi
- ┌──────────────────┐  writes   ┌───────────────────────┐   reads   ┌──────────────────┐
- │  HUD (this site) │ ────────▶ │ PodSettings (1 record)│ ◀──────── │ pi-agent/agent.py│
- │                  │ ◀──────── │ SensorReading         │ ◀──────── │  (x-agent-key)   │
- └──────────────────┘ subscribe │ SettingsChangeLog     │  push-sensor-reading function
-                                └───────────────────────┘
+ phone / tablet / laptop                        Raspberry Pi 5 (pi-agent/agent.py)
+ ┌──────────────────┐   HTTP on the     ┌──────────────────────────────────────────┐
+ │  HUD in browser  │ ─ local Wi-Fi ──▶ │ web.py      serves the HUD + JSON API     │
+ │  (home screen)   │ ◀─ live events ── │ store.py    settings, readings, history   │
+ └──────────────────┘                   │             in SQLite (xrpod.db)         │
+                                        │ hardware.py heater, AC, fan, sensors     │
+ Unity (VR) ── same API ──────────────▶ │ scent.py    scent machine                │
+                                        └──────────────────────────────────────────┘
 ```
 
 ## Structure
 
 ```
-base44/
-├── config.jsonc                       # Project + site settings
-├── entities/
-│   ├── PodSettings.jsonc              # Desired state: HUD writes, Pi reads
-│   ├── SensorReading.jsonc            # Actual readings pushed by the Pi
-│   └── SettingsChangeLog.jsonc        # One row per settings field change
-└── functions/
-    └── push-sensor-reading/           # Pi → backend, guarded by PI_AGENT_KEY
-src/
-├── App.jsx                            # The HUD dashboard
-├── components/                        # Readouts, cards, history panel, UI bits
-├── hooks/                             # usePodSettings, useLatestReading, useChangeLog
-└── lib/                               # Field defaults/labels, relative time
-public/                                # PWA manifest + home-screen icons
-pi-agent/                              # Runs on the Pi (not part of the web build)
-├── agent.py                           # Main loop: sensors → backend → hardware
-└── scent.py                           # Scent machine (cartridges + intensity PWM)
-vr/README.md                           # Where the Unity project lives and how it connects
+src/                     # The HUD (Vite + React + Tailwind)
+├── App.jsx              # The dashboard
+├── api/pod.js           # Client for the Pi's API + live events
+├── components/          # Readouts, cards, history panel, UI bits
+├── hooks/               # usePodSettings, useLatestReading, useChangeLog
+└── lib/                 # Field labels, relative time
+public/                  # PWA manifest + home-screen icons
+pi-agent/                # Runs on the Pi
+├── agent.py             # Entry point: starts the web server + control loop
+├── web.py               # HTTP server: HUD files, API, live events
+├── store.py             # SQLite storage + validation of every change
+├── hardware.py          # Sensors and actuators (stubbed until wired up)
+├── scent.py             # Scent machine (one cartridge at a time + intensity PWM)
+├── test_pod.py          # Tests (run in CI)
+└── xrpod.service        # systemd unit: start on boot
+vr/README.md             # How the Unity project connects
 ```
 
 ## How it works
 
-- **PodSettings** is a single record holding the desired state (target temp and
-  humidity, fan speed, heater/AC, scent). Every HUD control writes straight to
-  it on change — the UI updates immediately and saves in the background, with
-  no save button. Sliders save when you let go, so a drag is one write. Heater
-  and AC are mutually exclusive. If two records ever exist, the oldest one is
-  canonical (both the HUD and the Pi use that rule).
-- **SettingsChangeLog** gets one record per changed field (old → new value).
-  Turning the heater on while the AC is on logs two rows: `heater_on` and
-  `ac_on`. The **History** panel shows the latest 50, live.
-- **SensorReading** rows are pushed by the Pi through the
-  `push-sensor-reading` function. The top of the HUD shows the latest one live
-  and flags it as stale if the Pi hasn't reported in a minute.
-- Access rules: no login yet, so anyone can read/create (and update
-  PodSettings). Readings and log rows can't be edited. Only admins can delete
-  anything.
+- **Settings** (target temp and humidity, fan speed, heater/AC, scent) live
+  on the Pi. Every HUD control saves straight away; there's no save button.
+  The screen updates instantly, and quick changes in a row are merged into
+  one save. Sliders save when you let go.
+- **The Pi validates every change.** Out-of-range values, unknown fields and
+  "heater and AC both on" are rejected. Turning one of heater/AC on turns
+  the other off.
+- **History:** each changed field gets one row (old → new value, plus the
+  device's IP address). The **History** panel shows the latest 50.
+- **Live updates:** every 2 seconds the Pi reads the sensors, applies the
+  settings to the hardware and pushes the reading to every open HUD. A
+  change made on one phone shows up on the others immediately. If the Pi
+  restarts or Wi-Fi drops, the HUD reconnects by itself.
+- **Storage:** readings older than 24 hours are deleted, and history keeps
+  the newest 5,000 changes, so the SD card doesn't fill up.
 
-## Setup
+## Try it on your laptop (no Pi needed)
 
-Requires Node.js 20.19+ and the Base44 CLI (`npm install -g base44`, or prefix
-the commands below with `npx`).
+The hardware is stubbed, so the whole system runs anywhere with Python 3 and
+Node.js 20.19+:
 
 ```bash
 npm install
-base44 login
-base44 link --create --name XRPod   # first time only; writes base44/.app.jsonc (git-ignored)
+npm run build              # builds the HUD into dist/
+python3 pi-agent/agent.py  # open http://localhost:8080
 ```
 
-To link to an app a teammate already created, run `base44 link` and pick it.
-
-### Push the entities
+To work on the HUD with hot reload, keep the agent running and, in a second
+terminal, run:
 
 ```bash
-base44 entities push
+npm run dev                # open the URL it prints; /api is forwarded to the agent
+POD_URL=http://xrpod.local npm run dev   # …or use the real Pi's data instead
 ```
 
-Run this again whenever you edit a file in `base44/entities/`.
+Run the Pi tests with `python3 -m unittest discover -s pi-agent -v`.
 
-### Set the Pi's shared secret
+## Run it on the Pi
 
-The Pi is a device, not a logged-in user, so `push-sensor-reading` checks an
-`x-agent-key` header against the `PI_AGENT_KEY` secret instead:
+1. **Name the Pi `xrpod`** in Raspberry Pi Imager when you flash the SD card,
+   or later with `sudo raspi-config` → System Options → Hostname. Phones can
+   then reach it at `http://xrpod.local`.
+2. **Get the code and build the HUD:**
+   ```bash
+   git clone https://github.com/Hitthenutz/XRPod.git ~/XRPod
+   cd ~/XRPod
+   npm install && npm run build
+   ```
+   Building needs Node.js 20.19 or newer. Raspberry Pi OS's own `nodejs`
+   package is older, so install Node 22 from [NodeSource](https://github.com/nodesource/distributions)
+   first. Alternatively, run `npm run build` on a laptop and copy the `dist/`
+   folder to `~/XRPod/dist` on the Pi.
+3. **Start it on boot:**
+   ```bash
+   sudo cp pi-agent/xrpod.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now xrpod
+   journalctl -u xrpod -f     # watch the logs
+   ```
+   The service runs on port 80. If your Pi username isn't `pi`, edit `User=`
+   and the paths in the file first.
+4. **Update later** with `cd ~/XRPod && git pull && npm install && npm run build && sudo systemctl restart xrpod`.
 
-```bash
-# generate a long random key and store it as an app secret
-KEY=$(openssl rand -hex 32)
-base44 secrets set PI_AGENT_KEY=$KEY
-echo "$KEY"          # put this same value in the Pi agent's PI_AGENT_KEY
-base44 secrets list  # confirm it's there (values aren't shown)
-```
+Settings live in `pi-agent/xrpod.db`. Delete it, with the service stopped,
+to reset everything to defaults.
 
-To rotate it, set a new value and update the Pi.
+### Hardware
 
-### Run locally
+Everything is stubbed until you fill in the `TODO(hardware)` parts of
+`pi-agent/hardware.py` (heater relay, AC relay, fan PWM, temperature and
+humidity sensor) and set the pin numbers at the top of `pi-agent/scent.py`.
 
-```bash
-base44 site dev   # runs `npm run dev` with your app id injected
-```
+Safety rules the Pi enforces no matter what any client sends:
 
-This talks to your real Base44 backend. Plain `npm run dev` also works if you
-set `VITE_BASE44_APP_ID` in `.env.local`.
+- the heater and AC never run together,
+- percentages are clamped to 0–100 and junk values mean off,
+- only one scent cartridge is ever on,
+- when the service stops, every output turns off.
 
-## Deploy
-
-```bash
-base44 deploy --build
-```
-
-This pushes entities, deploys the `push-sensor-reading` function, builds the
-site and publishes it. You can also do it in pieces:
-
-```bash
-base44 entities push
-base44 functions deploy push-sensor-reading
-base44 site deploy --build
-base44 site open          # open the live site
-```
-
-Check the function's logs with `base44 logs --function push-sensor-reading`.
-
-## Raspberry Pi agent
-
-`pi-agent/` uses only the Python standard library (plus `RPi.GPIO`, which
-Raspberry Pi OS ships with, once you drive real pins). Copy the folder to the
-Pi, fill in the placeholders described at the top of `agent.py` (`APP_DOMAIN`,
-`APP_ID`, `PI_AGENT_KEY`, and the real sensor/relay/PWM code), then run:
-
-```bash
-APP_DOMAIN=your-app.base44.app APP_ID=your_app_id PI_AGENT_KEY=... python3 agent.py
-```
-
-Every 15 seconds (`POLL_SECONDS`) it reads the sensors, POSTs to
-`https://APP_DOMAIN/functions/push-sensor-reading`, fetches PodSettings, and
-applies it to the hardware. Each loop is 2 Base44 requests, so check your
-plan's limits before lowering the interval. Until you fill them in, the
-sensor and actuator code is stubbed with fake values, so you can test the
-whole loop before the hardware is wired.
-
-Safety behavior:
-
-- Heater and AC never run together, even if both are requested.
-- Values from the network are clamped to 0–100, and junk values mean off.
-- If the Pi can't reach the backend for 2 minutes
-  (`SETTINGS_TIMEOUT_SECONDS`), it turns the heater and AC off.
-- On exit, everything turns off.
-
-### Scent machine
-
-`pi-agent/scent.py` drives one output per scent cartridge (only one is ever
-on) plus a PWM output for intensity. Set the pin numbers at the top of the
-file, then bench-test it on its own:
+Bench-test the scent machine on its own:
 
 ```bash
 cd pi-agent
@@ -155,24 +126,50 @@ python3 scent.py lavender 60                         # stub: logs only
 SCENT_HARDWARE=gpio python3 scent.py lavender 60 10  # real pins for 10 s
 ```
 
-Run the agent with `SCENT_HARDWARE=gpio` to use real pins there too.
-
-Quick test of the function from any machine:
-
-```bash
-curl -X POST https://your-app.base44.app/functions/push-sensor-reading \
-  -H "Content-Type: application/json" -H "x-agent-key: $KEY" \
-  -d '{"actual_temp_f": 71.5, "actual_humidity_pct": 44}'
-```
+Then uncomment `SCENT_HARDWARE=gpio` in `xrpod.service`.
 
 ## Install on a phone or tablet
 
-The HUD is a Progressive Web App, so there's no app store step. Open the
-deployed site and add it to your home screen:
+Connect to the same Wi-Fi as the Pi, open `http://xrpod.local` (or the Pi's
+IP address), then:
 
 - **iPhone / iPad (Safari):** tap **Share** → **Add to Home Screen**.
-- **Android (Chrome):** tap **⋮** → **Add to Home screen** (or **Install app**).
-- **Desktop Chrome / Edge:** click the install icon in the address bar.
+- **Android (Chrome):** tap **⋮** → **Add to Home screen**.
 
-It opens full-screen with the XRPod icon, like a native app. It still needs a
-network connection to reach the pod's backend.
+It opens full-screen with the XRPod icon, like an app.
+
+## API (for Unity or scripts)
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/api/settings` | Current settings |
+| `PATCH` | `/api/settings` | Change settings, e.g. `{"fan_speed_pct": 40}`. Returns the saved settings, or `400` with an `error` message |
+| `GET` | `/api/readings/latest` | Newest sensor reading |
+| `GET` | `/api/history?limit=50` | Newest changes first |
+| `GET` | `/api/events` | Live stream (Server-Sent Events): `settings`, `reading`, `history` |
+
+```bash
+curl http://xrpod.local/api/settings
+curl -X PATCH http://xrpod.local/api/settings \
+  -H "Content-Type: application/json" -d '{"selected_scent": "pine"}'
+```
+
+## Security
+
+The HUD is meant for the pod's local network. **Anyone on the same Wi-Fi can
+open it and change settings**; there's no login. Use a private network for
+the pod, such as your own router or a hotspot from a phone or the Pi, not
+open campus Wi-Fi.
+
+What's in place:
+
+- The Pi rejects invalid values before they reach the hardware.
+- Other websites can't change settings through a visitor's browser (CSRF
+  protection): writes must be JSON, and the browser's `Origin` must match
+  the Pi.
+- Only files inside `dist/` are served, so the database and code aren't
+  reachable.
+
+**Remote access** (controlling the pod from off its network) isn't set up.
+The safest way to add it later is [Tailscale](https://tailscale.com) on the
+Pi and the phones, rather than opening a port on the router.

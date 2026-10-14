@@ -23,8 +23,7 @@ import time
 log = logging.getLogger("xrpod-agent.scent")
 
 # TODO(hardware): BCM pin numbers for each cartridge output. Keys must match
-# the selected_scent enum in base44/entities/PodSettings.jsonc ("none" means
-# off and has no pin).
+# SCENTS in store.py ("none" means off and has no pin).
 CARTRIDGE_PINS = {
     "lavender": 5,
     "pine": 6,

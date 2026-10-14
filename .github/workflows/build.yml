@@ -27,3 +27,8 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Pi controller tests: safety rules, validation, web server protections.
+      # Standard library only, so the runner's built-in Python is enough.
+      - name: Test Pi controller
+        run: python3 -m unittest discover -s pi-agent -v

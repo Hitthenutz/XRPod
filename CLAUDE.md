@@ -1,16 +1,21 @@
 # CLAUDE.md
 
-XRPod is a manual control HUD for a senior design capstone pod. It's a Base44
-app (Vite + React + Tailwind) plus a Python agent that runs on the pod's
-Raspberry Pi. See README.md for setup, deploy and how the pieces fit together.
+XRPod is a manual control HUD for a senior design capstone pod. The Raspberry
+Pi 5 hosts everything: a Python server (standard library only) serves the HUD
+(Vite + React + Tailwind) and its JSON API, stores data in SQLite and drives
+the hardware. There's no cloud backend. See README.md for setup and how the
+pieces fit together.
 
 ## Layout
 
-- `base44/entities/*.jsonc`: data schemas and access rules (RLS)
-- `base44/functions/push-sensor-reading/`: Deno function the Pi calls
-- `src/`: the HUD (`App.jsx`, `components/`, `hooks/`, `lib/`)
-- `pi-agent/agent.py`: runs on the Pi, stdlib-only, not part of the web build
-- `pi-agent/scent.py`: scent machine control, imported by `agent.py`
+- `src/`: the HUD (`App.jsx`, `components/`, `hooks/`, `lib/`); `src/api/pod.js`
+  is the only place that talks to the Pi
+- `pi-agent/agent.py`: entry point, starts the web server and control loop
+- `pi-agent/web.py`: HTTP server (HUD files, `/api/*`, Server-Sent Events)
+- `pi-agent/store.py`: SQLite storage and validation of every settings change
+- `pi-agent/hardware.py`: sensors and actuators; `pi-agent/scent.py`: scent machine
+- `pi-agent/test_pod.py`: tests, run in CI
+- `pi-agent/xrpod.service`: systemd unit for the Pi
 - `vr/README.md`: the Unity project lives in a separate repo; this explains
   how it connects
 - `.github/workflows/`: `build.yml` (build check) and `security.yml`
@@ -19,10 +24,10 @@ Raspberry Pi. See README.md for setup, deploy and how the pieces fit together.
 
 ```bash
 npm install
-npm run build         # must pass; this is what CI runs
-base44 site dev       # local dev against the real backend
-base44 entities push  # after editing base44/entities/
-base44 deploy --build # full deploy
+npm run build                               # must pass; CI runs it
+python3 -m unittest discover -s pi-agent -v # must pass; CI runs it
+python3 pi-agent/agent.py                   # run everything at :8080 (stub hardware)
+npm run dev                                 # HUD hot reload; /api proxied to :8080
 ```
 
 ## Git and commits
@@ -40,44 +45,41 @@ base44 deploy --build # full deploy
 
 - Match the existing style: function components, hooks in `src/hooks/`,
   shared constants in `src/lib/podSettings.js`, `@/` import alias.
-- Every PodSettings change goes through `applyChanges()` in
-  `usePodSettings.js`, so it's saved optimistically and logged to
-  SettingsChangeLog (one row per changed field). Don't write to PodSettings
-  anywhere else.
-- Heater and AC must stay mutually exclusive, both in the HUD and in
-  `apply_settings()` on the Pi.
-- If you change a PodSettings field or default, update it in all three places:
-  `base44/entities/PodSettings.jsonc`, `src/lib/podSettings.js` and
-  `DEFAULT_SETTINGS` in `pi-agent/agent.py`. A new scent also needs a pin in
-  `CARTRIDGE_PINS` in `pi-agent/scent.py`.
-- Keep Base44 request counts low. The plan is rate-limited, so batch writes,
-  and don't poll faster than needed (the Pi defaults to 15 s).
+- Every settings change in the HUD goes through `applyChanges()` in
+  `usePodSettings.js`, so it's saved optimistically. The Pi logs history (one
+  row per changed field) in `Store.update_settings()`; don't write settings
+  any other way.
+- `pi-agent/` stays standard-library Python (plus `RPi.GPIO` on the Pi). Ask
+  before adding pip packages.
+- Heater and AC must stay mutually exclusive in the HUD, in
+  `validate_patch()` (store.py) and in `apply_settings()` (hardware.py).
+- If you change a settings field or default, update `SETTINGS_SCHEMA` and
+  `DEFAULT_SETTINGS` in `pi-agent/store.py` and `DEFAULT_SETTINGS` in
+  `src/lib/podSettings.js`. A new scent also goes in `SCENTS` (store.py),
+  `SCENTS` (podSettings.js) and `CARTRIDGE_PINS` (scent.py).
 
 ## Security rules
 
-- **Never commit secrets.** No API keys, `PI_AGENT_KEY` values, tokens or
-  `.env` files. `PI_AGENT_KEY` lives only in Base44 secrets
-  (`base44 secrets set`) and in the Pi's environment. `.env*` and
-  `base44/.app.jsonc` are git-ignored; keep them that way.
-- **Keep the device auth in `push-sensor-reading`.** It must keep checking
-  `x-agent-key` against `PI_AGENT_KEY` with the constant-time compare. It
-  must also keep validating input and passing only known fields to
-  `asServiceRole`, because service role bypasses all access rules.
-- **Don't loosen access rules (RLS) without asking.** Right now there's no
-  login, so PodSettings is open to read and update by anyone with the URL.
-  That's a known, accepted risk for now. SensorReading and SettingsChangeLog
-  are append-only, and delete is admin-only everywhere.
-- **Never use `asServiceRole` from the frontend.** It only exists in backend
-  functions.
-- **The Pi agent must fail safe.** It keeps the last applied state through a
-  short network blip, but turns the heater and AC off once it has been out of
-  contact for `SETTINGS_TIMEOUT_SECONDS`. On exit it turns every output off.
-  Only one scent cartridge is ever on at a time. Never let a bad value from the
-  network drive the hardware: clamp percentages to 0–100 and never run the
-  heater and AC together.
+- **Never commit secrets** (API keys, tokens, Wi-Fi passwords, `.env` files)
+  or the Pi's database (`pi-agent/*.db`, git-ignored).
+- **The HUD is LAN-only with no login.** Anyone on the pod's Wi-Fi can change
+  settings; that's a known, accepted risk for now. Don't expose it to the
+  internet (no port forwarding); remote access should go through something
+  like Tailscale. Ask before adding auth or changing this.
+- **Keep the web server's protections** in `web.py`: writes must be JSON with
+  a size limit, a browser `Origin` must match `Host` (CSRF), and static files
+  are only served from inside `dist/`. Keep the matching tests.
+- **Validate everything on the Pi.** Every write goes through
+  `validate_patch()`; reject unknown fields and out-of-range values rather
+  than clamping them silently.
+- **The Pi must fail safe.** Never let a bad value drive the hardware: clamp
+  percentages to 0–100 in `hardware.py`, never run the heater and AC
+  together, only one scent cartridge on at a time, and every output off when
+  the service stops.
 - **Pin GitHub Actions to a full commit SHA**, with the version in a comment
   (`uses: owner/action@<40-char sha> # v1.2.3`), never a tag like `@v4`.
   Tags can be moved to point at new code. Dependabot updates the pins.
 - **Don't weaken CI to get green.** Don't disable or skip the checks in
-  `security.yml` (npm audit, dependency review, gitleaks, CodeQL); fix the
-  finding. New dependencies must not have high/critical vulnerabilities.
+  `build.yml` (build, Pi tests) or `security.yml` (npm audit, dependency
+  review, gitleaks, CodeQL); fix the finding. New dependencies must not have
+  high/critical vulnerabilities.

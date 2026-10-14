@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { base44 } from "@/api/base44Client";
-import {
-  DEFAULT_SETTINGS,
-  SETTINGS_FIELDS,
-  stringifyValue,
-} from "@/lib/podSettings";
-
-const PodSettings = base44.entities.PodSettings;
-const SettingsChangeLog = base44.entities.SettingsChangeLog;
+import { getSettings, subscribe, updateSettings } from "@/api/pod";
+import { SETTINGS_FIELDS } from "@/lib/podSettings";
 
 // Changes made within this window are merged into one save, so tapping
 // through scents or nudging a slider with the arrow keys costs one write.
 const SAVE_DELAY_MS = 400;
-// Backoff between retries when Base44 is busy (rate limit / 5xx / offline).
+// Backoff between retries when the Pi is busy, restarting or out of reach.
 const RETRY_DELAYS_MS = [1000, 3000, 8000];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -33,29 +26,12 @@ async function withRetry(fn) {
   }
 }
 
-// The oldest PodSettings record is the canonical one (the Pi agent uses the
-// same rule), so a duplicate created by a race is harmlessly ignored.
-async function loadOrCreateSettings() {
-  const [existing] = await PodSettings.list("created_date", 1);
-  if (existing) return existing;
-  return PodSettings.create(DEFAULT_SETTINGS);
-}
-
-async function currentUserEmail() {
-  try {
-    const user = await base44.auth.me();
-    return user?.email ?? null;
-  } catch {
-    return null; // not logged in — fine, there's no auth yet
-  }
-}
-
 /**
- * Loads the single PodSettings record and exposes `applyChanges(patch)`.
+ * Loads the pod settings from the Pi and exposes `applyChanges(patch)`.
  *
  * Changes show up immediately (optimistic). After a short pause they are
- * merged into one write, retried if Base44 is busy, and logged as one
- * SettingsChangeLog row per field whose saved value actually changed.
+ * merged into one write and retried if the Pi is briefly unreachable. The
+ * Pi validates the change and logs one history row per changed field.
  *
  * `status` is "idle" | "saving" | "error".
  */
@@ -74,7 +50,6 @@ export function usePodSettings() {
   const queueRef = useRef(Promise.resolve());
   const inFlightRef = useRef(0);
   const lastErrorRef = useRef(null);
-  const emailRef = useRef(undefined);
 
   const show = useCallback((next) => {
     settingsRef.current = next;
@@ -105,20 +80,9 @@ export function usePodSettings() {
     if (changed.length === 0) return;
 
     const diff = Object.fromEntries(changed.map((f) => [f, patch[f]]));
-    const saved = await withRetry(() => PodSettings.update(before.id, diff));
-    savedRef.current = { ...before, ...diff, ...saved };
-
-    const changed_by = emailRef.current ?? null;
-    await withRetry(() =>
-      SettingsChangeLog.bulkCreate(
-        changed.map((f) => ({
-          field_name: f,
-          old_value: stringifyValue(before[f]),
-          new_value: stringifyValue(patch[f]),
-          changed_by,
-        })),
-      ),
-    );
+    // The Pi returns the full saved settings (it may also have switched the
+    // heater or AC off to keep them exclusive).
+    savedRef.current = await withRetry(() => updateSettings(diff));
   }, []);
 
   const flush = useCallback(() => {
@@ -145,30 +109,37 @@ export function usePodSettings() {
 
   useEffect(() => {
     let cancelled = false;
-    withRetry(loadOrCreateSettings)
-      .then((record) => {
-        if (cancelled) return;
+
+    const load = () =>
+      withRetry(getSettings)
+        .then((record) => {
+          // Don't let a refetch clobber a save that's still in progress.
+          if (cancelled || inFlightRef.current > 0) return;
+          savedRef.current = record;
+          showSavedWithPending();
+          // Reachable again and showing the Pi's real values: clear errors.
+          lastErrorRef.current = null;
+          setError(null);
+          setStatus((s) => (s === "error" ? "idle" : s));
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          lastErrorRef.current = err;
+          setError(err);
+          setStatus("error");
+        });
+
+    load();
+
+    // Changes made from another phone/tablet/laptop show up live, and a
+    // reconnect after the Pi restarts or Wi-Fi drops reloads everything.
+    // Local changes that haven't been saved yet stay on top.
+    const unsubscribe = subscribe({
+      settings: (record) => {
         savedRef.current = record;
-        show(record);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        lastErrorRef.current = err;
-        setError(err);
-        setStatus("error");
-      });
-
-    currentUserEmail().then((email) => {
-      emailRef.current = email;
-    });
-
-    // Changes made from another phone/tablet/laptop show up live. Local
-    // changes that haven't been saved yet stay on top.
-    const unsubscribe = PodSettings.subscribe((event) => {
-      const saved = savedRef.current;
-      if (!saved || event.id !== saved.id || event.type !== "update") return;
-      savedRef.current = { ...saved, ...event.data };
-      if (inFlightRef.current === 0) showSavedWithPending();
+        if (inFlightRef.current === 0) showSavedWithPending();
+      },
+      open: load,
     });
 
     return () => {
@@ -176,7 +147,7 @@ export function usePodSettings() {
       unsubscribe();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [show, showSavedWithPending]);
+  }, [showSavedWithPending]);
 
   const applyChanges = useCallback(
     (patch) => {

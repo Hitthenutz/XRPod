@@ -12,17 +12,19 @@ commit.
 
 ## How Unity can talk to the pod
 
-| Option | How | Trade-off |
-|---|---|---|
-| **Pi on the local network** (recommended) | The Pi agent runs a small WebSocket or UDP server; Unity connects to the Pi's IP. | Fast and doesn't count against the Base44 quota. Headset and Pi must be on the same Wi-Fi. |
-| **Through Base44** | Unity reads `PodSettings` / `SensorReading` over HTTPS with `UnityWebRequest`, the same way `pi-agent/agent.py` does. | Works from anywhere, but polling uses Base44 requests. Keep it to every 15 s or more. |
+The Pi serves a small JSON API on the pod's network (full list in the main
+README's **API** section). Unity can use it with `UnityWebRequest`; the
+headset must be on the same Wi-Fi as the Pi.
 
-The data Unity needs is already defined in this repo:
-
-- `base44/entities/PodSettings.jsonc`: what the pod should be doing
-  (scent, fan, heater/AC, targets)
-- `base44/entities/SensorReading.jsonc`: what it's actually doing
-
-If the VR experience needs to *drive* the pod (e.g. a scene triggers pine
-scent), send that through the Pi rather than writing to PodSettings directly,
-so the Pi stays the one place that enforces hardware safety.
+- **Read what the pod is doing:** `GET http://xrpod.local/api/settings` and
+  `GET http://xrpod.local/api/readings/latest`. Polling every second or two
+  is fine; there's no usage limit.
+- **Drive the pod from a scene** (e.g. a forest scene turns on pine scent):
+  `PATCH http://xrpod.local/api/settings` with
+  `Content-Type: application/json` and a body like
+  `{"selected_scent": "pine", "scent_intensity_pct": 60}`. The Pi validates
+  it and still enforces every hardware safety rule. The change also shows up
+  in the HUD and its History panel.
+- **Live updates without polling:** `GET /api/events` is a Server-Sent Events
+  stream (`settings`, `reading` and `history` events). Unity has no built-in
+  SSE client, so polling is simpler unless you need instant updates.
