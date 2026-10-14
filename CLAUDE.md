@@ -75,6 +75,9 @@ base44 deploy --build # full deploy
   Only one scent cartridge is ever on at a time. Never let a bad value from the
   network drive the hardware: clamp percentages to 0–100 and never run the
   heater and AC together.
+- **Pin GitHub Actions to a full commit SHA**, with the version in a comment
+  (`uses: owner/action@<40-char sha> # v1.2.3`), never a tag like `@v4`.
+  Tags can be moved to point at new code. Dependabot updates the pins.
 - **Don't weaken CI to get green.** Don't disable or skip the checks in
   `security.yml` (npm audit, dependency review, gitleaks, CodeQL); fix the
   finding. New dependencies must not have high/critical vulnerabilities.
