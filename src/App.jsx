@@ -43,7 +43,7 @@ export default function App() {
             <span>
               {settings
                 ? "Your last change didn’t save, so the controls show what the pod actually has. Try again in a moment."
-                : "Couldn’t load the pod settings."}{" "}
+                : "Can’t reach the pod. Make sure this device is on the same Wi-Fi as the Pi."}{" "}
               <span className="text-red-300/80">({error.message ?? String(error)})</span>
             </span>
           </div>

@@ -1,6 +1,6 @@
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
 
-// Mirrors the defaults in base44/entities/PodSettings.jsonc.
+// Mirrors DEFAULT_SETTINGS in pi-agent/store.py, which owns the real values.
 export const DEFAULT_SETTINGS = {
   target_temp_f: 72,
   target_humidity_pct: 45,
@@ -40,6 +40,3 @@ export function formatFieldValue(field, value) {
       return value;
   }
 }
-
-export const stringifyValue = (value) =>
-  value === null || value === undefined ? null : String(value);

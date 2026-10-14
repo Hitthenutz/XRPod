@@ -9,8 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.40",
-    "@base44/vite-plugin": "^1.0.30",
     "lucide-react": "^1.56.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"

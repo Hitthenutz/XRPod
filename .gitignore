@@ -15,9 +15,9 @@ dist
 .DS_Store
 *.swp
 
-# Base44
-.app.json*
-.types/
+# Pi database (settings, readings, history)
+pi-agent/*.db
+pi-agent/*.db-*
 
 # Python (pi-agent)
 __pycache__/
