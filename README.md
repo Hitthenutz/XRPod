@@ -30,7 +30,10 @@ src/
 ├── hooks/                             # usePodSettings, useLatestReading, useChangeLog
 └── lib/                               # Field defaults/labels, relative time
 public/                                # PWA manifest + home-screen icons
-pi-agent/agent.py                      # Runs on the Pi (not part of the web build)
+pi-agent/                              # Runs on the Pi (not part of the web build)
+├── agent.py                           # Main loop: sensors → backend → hardware
+└── scent.py                           # Scent machine (cartridges + intensity PWM)
+vr/README.md                           # Where the Unity project lives and how it connects
 ```
 
 ## How it works
@@ -116,18 +119,43 @@ Check the function's logs with `base44 logs --function push-sensor-reading`.
 
 ## Raspberry Pi agent
 
-`pi-agent/agent.py` uses only the Python standard library. Copy it to the Pi,
-fill in the placeholders described at the top of the file (`APP_DOMAIN`,
+`pi-agent/` uses only the Python standard library (plus `RPi.GPIO`, which
+Raspberry Pi OS ships with, once you drive real pins). Copy the folder to the
+Pi, fill in the placeholders described at the top of `agent.py` (`APP_DOMAIN`,
 `APP_ID`, `PI_AGENT_KEY`, and the real sensor/relay/PWM code), then run:
 
 ```bash
 APP_DOMAIN=your-app.base44.app APP_ID=your_app_id PI_AGENT_KEY=... python3 agent.py
 ```
 
-Every 3 seconds it reads the sensors, POSTs to
+Every 15 seconds (`POLL_SECONDS`) it reads the sensors, POSTs to
 `https://APP_DOMAIN/functions/push-sensor-reading`, fetches PodSettings, and
-applies it to the hardware. Until then the sensor and actuator code is stubbed
-with fake values, so you can test the whole loop before the hardware is wired.
+applies it to the hardware. Each loop is 2 Base44 requests, so check your
+plan's limits before lowering the interval. Until you fill them in, the
+sensor and actuator code is stubbed with fake values, so you can test the
+whole loop before the hardware is wired.
+
+Safety behavior:
+
+- Heater and AC never run together, even if both are requested.
+- Values from the network are clamped to 0–100, and junk values mean off.
+- If the Pi can't reach the backend for 2 minutes
+  (`SETTINGS_TIMEOUT_SECONDS`), it turns the heater and AC off.
+- On exit, everything turns off.
+
+### Scent machine
+
+`pi-agent/scent.py` drives one output per scent cartridge (only one is ever
+on) plus a PWM output for intensity. Set the pin numbers at the top of the
+file, then bench-test it on its own:
+
+```bash
+cd pi-agent
+python3 scent.py lavender 60                         # stub: logs only
+SCENT_HARDWARE=gpio python3 scent.py lavender 60 10  # real pins for 10 s
+```
+
+Run the agent with `SCENT_HARDWARE=gpio` to use real pins there too.
 
 Quick test of the function from any machine:
 

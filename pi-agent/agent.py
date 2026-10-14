@@ -20,7 +20,9 @@ WHAT TO FILL IN
   read_sensors()     Replace the stub with real sensor reads (e.g. a DHT22 /
                      SHT31 for temp+humidity, a tach input for fan RPM).
   apply_settings()   Replace the stubs with real GPIO relay + PWM calls
-                     (heater relay, AC relay, fan PWM, scent diffuser).
+                     (heater relay, AC relay, fan PWM).
+  scent.py           The scent machine. Set its pin numbers, then run with
+                     SCENT_HARDWARE=gpio to drive real outputs.
 
 All three settings can also come from environment variables of the same
 name, which is handy for a systemd unit:
@@ -40,6 +42,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from scent import ScentController
+
 # --------------------------------------------------------------------------
 # Configuration — fill these in (or set the matching environment variables)
 # --------------------------------------------------------------------------
@@ -47,7 +51,13 @@ APP_DOMAIN = os.environ.get("APP_DOMAIN", "YOUR-APP.base44.app")
 APP_ID = os.environ.get("APP_ID", "YOUR_APP_ID")
 PI_AGENT_KEY = os.environ.get("PI_AGENT_KEY", "CHANGE_ME")
 
-POLL_SECONDS = float(os.environ.get("POLL_SECONDS", "3"))
+# Each loop is 2 requests to Base44, so this sets how fast the app's usage
+# quota is spent: 15 s is ~11,500 requests/day. Lower it only if your plan
+# allows.
+POLL_SECONDS = float(os.environ.get("POLL_SECONDS", "15"))
+# Safety watchdog: if the Pi can't reach the backend for this long, it turns
+# the heater and AC off rather than running them unattended.
+SETTINGS_TIMEOUT_SECONDS = float(os.environ.get("SETTINGS_TIMEOUT_SECONDS", "120"))
 HTTP_TIMEOUT_SECONDS = 10
 
 BASE_URL = f"https://{APP_DOMAIN}"
@@ -79,8 +89,8 @@ hardware_state = {
     "ac_running": False,
     "heater_running": False,
     "fan_pct": 0,
-    "scent": "none",
 }
+scent_machine = None  # ScentController, created in setup_hardware()
 
 
 # --------------------------------------------------------------------------
@@ -98,7 +108,9 @@ def setup_hardware():
         fan_pwm = GPIO.PWM(FAN_PWM_PIN, 25_000); fan_pwm.start(0)
         dht = adafruit_dht.DHT22(board.D4)
     """
+    global scent_machine
     log.info("setup_hardware(): using STUBS — no real GPIO configured")
+    scent_machine = ScentController()
 
 
 def cleanup_hardware():
@@ -106,7 +118,12 @@ def cleanup_hardware():
 
     TODO(hardware): turn relays off, stop PWM, GPIO.cleanup().
     """
-    log.info("cleanup_hardware(): all outputs off (stub)")
+    set_heater_relay(False)
+    set_ac_relay(False)
+    set_fan_pwm(0)
+    if scent_machine:
+        scent_machine.close()
+    log.info("cleanup_hardware(): all outputs off")
 
 
 # --------------------------------------------------------------------------
@@ -130,7 +147,7 @@ def read_sensors():
         "ac_running": hardware_state["ac_running"],
         "heater_running": hardware_state["heater_running"],
         "fan_rpm": max(0, round(fake_rpm)),
-        "scent_active": hardware_state["scent"],
+        "scent_active": scent_machine.active if scent_machine else "none",
         "reading_source": "pi-agent",
     }
 
@@ -154,9 +171,15 @@ def set_fan_pwm(pct):
 
 
 def set_scent(scent, intensity_pct):
-    # TODO(hardware): select the cartridge for `scent` and set the diffuser
-    # PWM to intensity_pct; "none" means diffuser off.
-    hardware_state["scent"] = scent
+    scent_machine.apply(scent, intensity_pct)
+
+
+def safe_heat_cool_off():
+    """Watchdog action: stop heating/cooling when we've lost the backend."""
+    if hardware_state["heater_running"] or hardware_state["ac_running"]:
+        log.warning("no settings for %ss — turning heater and AC off", SETTINGS_TIMEOUT_SECONDS)
+    set_heater_relay(False)
+    set_ac_relay(False)
 
 
 def apply_settings(settings):
@@ -178,20 +201,24 @@ def apply_settings(settings):
     if ac_on:
         set_ac_relay(True)
 
-    fan_pct = clamp(int(settings.get("fan_speed_pct") or 0), 0, 100)
-    set_fan_pwm(fan_pct)
+    set_fan_pwm(to_pct(settings.get("fan_speed_pct")))
 
-    scent = settings.get("selected_scent") or "none"
-    intensity = clamp(int(settings.get("scent_intensity_pct") or 0), 0, 100)
-    set_scent(scent, intensity if scent != "none" else 0)
+    scent = settings.get("selected_scent")
+    set_scent(scent if isinstance(scent, str) else "none", to_pct(settings.get("scent_intensity_pct")))
 
     # TODO(control): target_temp_f / target_humidity_pct are setpoints. If the
     # Pi should run a thermostat loop (rather than the HUD toggling relays
     # manually), compare them against read_sensors() here.
 
 
-def clamp(value, lo, hi):
-    return max(lo, min(hi, value))
+def to_pct(value):
+    """Coerce a value from the network into an int 0-100. Anything that isn't
+    a finite number (None, "abc", NaN, True) becomes 0, i.e. off."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    if value != value or value in (float("inf"), float("-inf")):  # NaN / inf
+        return 0
+    return max(0, min(100, int(value)))
 
 
 # --------------------------------------------------------------------------
@@ -245,6 +272,7 @@ def main():
     setup_hardware()
     apply_settings(DEFAULT_SETTINGS)
     last_settings = None
+    last_settings_at = time.monotonic()
 
     try:
         while True:
@@ -263,6 +291,7 @@ def main():
                     log.warning("no PodSettings record yet — open the HUD once to create it")
                 else:
                     apply_settings(settings)
+                    last_settings_at = time.monotonic()
                     if settings != last_settings:
                         log.info(
                             "applied settings: temp=%s°F hum=%s%% fan=%s%% heater=%s ac=%s scent=%s@%s%%",
@@ -276,8 +305,11 @@ def main():
                         )
                         last_settings = settings
             except Exception as err:
-                # Keep the last applied state; don't flap hardware on a blip.
+                # Keep the last applied state through a short blip, but don't
+                # heat or cool unattended through a long outage.
                 log.error("fetch settings failed: %s", describe_http_error(err))
+                if time.monotonic() - last_settings_at > SETTINGS_TIMEOUT_SECONDS:
+                    safe_heat_cool_off()
 
             time.sleep(max(0.0, POLL_SECONDS - (time.monotonic() - started)))
     except KeyboardInterrupt:

@@ -8,7 +8,7 @@ import { useLatestReading } from "@/hooks/useLatestReading";
 import { usePodSettings } from "@/hooks/usePodSettings";
 
 export default function App() {
-  const { settings, applyChanges, error, saving } = usePodSettings();
+  const { settings, applyChanges, error, status } = usePodSettings();
   const { reading, loading: readingLoading } = useLatestReading();
 
   return (
@@ -22,10 +22,12 @@ export default function App() {
             <p className="text-xs uppercase tracking-widest text-slate-500">Manual control HUD</p>
           </div>
           <span className="flex items-center gap-2 text-xs text-slate-400" aria-live="polite">
-            {saving ? (
+            {status === "saving" ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
               </>
+            ) : status === "error" ? (
+              <span className="text-red-300">Not saved</span>
             ) : settings ? (
               "Synced"
             ) : null}
@@ -38,7 +40,12 @@ export default function App() {
             className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Couldn’t reach the pod settings. {error.message ?? String(error)}</span>
+            <span>
+              {settings
+                ? "Your last change didn’t save, so the controls show what the pod actually has. Try again in a moment."
+                : "Couldn’t load the pod settings."}{" "}
+              <span className="text-red-300/80">({error.message ?? String(error)})</span>
+            </span>
           </div>
         )}
 

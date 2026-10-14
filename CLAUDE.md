@@ -10,6 +10,9 @@ Raspberry Pi. See README.md for setup, deploy and how the pieces fit together.
 - `base44/functions/push-sensor-reading/`: Deno function the Pi calls
 - `src/`: the HUD (`App.jsx`, `components/`, `hooks/`, `lib/`)
 - `pi-agent/agent.py`: runs on the Pi, stdlib-only, not part of the web build
+- `pi-agent/scent.py`: scent machine control, imported by `agent.py`
+- `vr/README.md`: the Unity project lives in a separate repo; this explains
+  how it connects
 - `.github/workflows/`: `build.yml` (build check) and `security.yml`
 
 ## Commands
@@ -45,7 +48,10 @@ base44 deploy --build # full deploy
   `apply_settings()` on the Pi.
 - If you change a PodSettings field or default, update it in all three places:
   `base44/entities/PodSettings.jsonc`, `src/lib/podSettings.js` and
-  `DEFAULT_SETTINGS` in `pi-agent/agent.py`.
+  `DEFAULT_SETTINGS` in `pi-agent/agent.py`. A new scent also needs a pin in
+  `CARTRIDGE_PINS` in `pi-agent/scent.py`.
+- Keep Base44 request counts low. The plan is rate-limited, so batch writes,
+  and don't poll faster than needed (the Pi defaults to 15 s).
 
 ## Security rules
 
@@ -63,8 +69,10 @@ base44 deploy --build # full deploy
   are append-only, and delete is admin-only everywhere.
 - **Never use `asServiceRole` from the frontend.** It only exists in backend
   functions.
-- **The Pi agent must fail safe.** On errors it keeps the last applied state,
-  and on exit it turns every output off. Never let a bad value from the
+- **The Pi agent must fail safe.** It keeps the last applied state through a
+  short network blip, but turns the heater and AC off once it has been out of
+  contact for `SETTINGS_TIMEOUT_SECONDS`. On exit it turns every output off.
+  Only one scent cartridge is ever on at a time. Never let a bad value from the
   network drive the hardware: clamp percentages to 0–100 and never run the
   heater and AC together.
 - **Don't weaken CI to get green.** Don't disable or skip the checks in
