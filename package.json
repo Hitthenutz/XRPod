@@ -11,14 +11,14 @@
   "dependencies": {
     "@base44/sdk": "^0.8.40",
     "@base44/vite-plugin": "^1.0.30",
-    "lucide-react": "^0.475.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "lucide-react": "^1.56.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.1.2",
     "tailwindcss": "^4.3.3",
-    "vite": "^6.1.0"
+    "vite": "^8.3.4"
   }
 }
