@@ -2,7 +2,7 @@
 node_modules
 
 # Build
-dist
+hud/dist
 
 # Environment
 .env
@@ -16,10 +16,12 @@ dist
 *.swp
 
 # Pi database (settings, readings, history)
-pi-agent/*.db
-pi-agent/*.db-*
+pi/*.db
+pi/*.db-*
 
-# Python (pi-agent)
+# Python (pi/)
 __pycache__/
 *.pyc
 .venv/
+
+# Unity ignores live in unity/.gitignore

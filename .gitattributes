@@ -1,0 +1,35 @@
+# Normalize line endings for text files.
+* text=auto
+
+# Unity: merge scenes and prefabs as text (Force Text serialization).
+unity/**/*.unity    merge=unityyamlmerge eol=lf
+unity/**/*.prefab   merge=unityyamlmerge eol=lf
+unity/**/*.asset    merge=unityyamlmerge eol=lf
+unity/**/*.meta     eol=lf
+
+# Unity binary assets go through Git LFS (run `git lfs install` once).
+unity/**/*.fbx      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.obj      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.blend    filter=lfs diff=lfs merge=lfs -text
+unity/**/*.png      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.jpg      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.jpeg     filter=lfs diff=lfs merge=lfs -text
+unity/**/*.tga      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.psd      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.exr      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.hdr      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.tif      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.tiff     filter=lfs diff=lfs merge=lfs -text
+unity/**/*.wav      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.mp3      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.ogg      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.mp4      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.mov      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.ttf      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.otf      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.dll      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.so       filter=lfs diff=lfs merge=lfs -text
+unity/**/*.aar      filter=lfs diff=lfs merge=lfs -text
+unity/**/*.zip      filter=lfs diff=lfs merge=lfs -text
+unity/**/LightingData.asset filter=lfs diff=lfs merge=lfs -text
+unity/**/Lightmap-*.exr     filter=lfs diff=lfs merge=lfs -text

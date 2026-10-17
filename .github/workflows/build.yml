@@ -5,13 +5,23 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch: # "Run workflow" button on the Actions tab
 
 permissions:
   contents: read
 
+# A new push to the same branch or PR cancels the run that's still going.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  hud:
+    name: HUD build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hud
     steps:
       - name: Check out repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -19,16 +29,63 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version-file: .nvmrc
+          node-version-file: hud/.nvmrc
           cache: npm
+          cache-dependency-path: hud/package-lock.json
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build
         run: npm run build
 
-      # Pi controller tests: safety rules, validation, web server protections.
-      # Standard library only, so the runner's built-in Python is enough.
+      # Download from the run's summary page and copy to ~/XRPod/hud/dist on
+      # the Pi, so the Pi doesn't need Node to update the HUD.
+      - name: Upload built HUD
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hud-dist
+          path: hud/dist
+          retention-days: 14
+
+  pi:
+    name: Pi tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Safety rules, validation, web server protections. Standard library
+      # only, so the runner's built-in Python is enough.
       - name: Test Pi controller
-        run: python3 -m unittest discover -s pi-agent -v
+        run: python3 -m unittest discover -s pi/tests -v
+
+  repo-size:
+    name: Repo size
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Keeps clones small: anything over 2 MB must be stored with Git LFS
+      # (see .gitattributes), and Unity's generated folders and the Pi's
+      # database must never be committed.
+      - name: Check for large or generated files
+        run: |
+          status=0
+          generated=$(git ls-files | grep -E '^unity/(Library|Temp|Logs|Obj|Builds?|UserSettings)/|^pi/.*\.db' || true)
+          if [ -n "$generated" ]; then
+            echo "::error::Generated files are committed (remove them with git rm --cached):"
+            echo "$generated"
+            status=1
+          fi
+          lfs=$(git lfs ls-files --name-only)
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            size=$(stat -c %s "$f")
+            if [ "$size" -gt 2097152 ] && ! grep -qxF "$f" <<< "$lfs"; then
+              echo "::error file=$f::$f is $((size / 1024)) KB; store it with Git LFS"
+              status=1
+            fi
+          done < <(git ls-files)
+          exit $status

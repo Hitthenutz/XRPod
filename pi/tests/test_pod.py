@@ -1,6 +1,6 @@
 """Tests for the Pi side. Run from the repo root:
 
-    python3 -m unittest discover -s pi-agent -v
+    python3 -m unittest discover -s pi/tests -v
 
 Covers the safety rules (heater/AC exclusion, junk values, one scent at a
 time), settings validation and history, and the web server's protections.
@@ -15,7 +15,7 @@ import unittest
 import urllib.error
 import urllib.request
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import hardware  # noqa: E402
 import scent  # noqa: E402
