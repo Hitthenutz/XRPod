@@ -65,8 +65,10 @@ export function ScentCard({ settings, reading, onChange }) {
           disabled={off}
           onCommit={(v) => onChange({ scent_intensity_pct: v })}
         />
-        {/* Readings lag a tick behind a change; don't show the old scent's result. */}
-        {!off && reading?.scent_check?.scent === settings.selected_scent && (
+        {/* Readings lag a tick behind a change; don't show the old run's result. */}
+        {!off &&
+          reading?.scent_check?.scent === settings.selected_scent &&
+          reading.scent_check.duty === settings.scent_intensity_pct && (
           <ScentCheck check={reading.scent_check} />
         )}
       </div>

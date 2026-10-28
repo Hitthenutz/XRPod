@@ -184,6 +184,13 @@ class ScentHubTests(unittest.TestCase):
         self.assertIsNone(scent.parse_detect(scent.decode(b"[NaN]")))
         self.assertIsNotNone(scent.parse_detect(detect()))
 
+    def test_absurd_messages_dont_raise(self):
+        # Either would escape paho's callback and kill its network thread.
+        self.link.deliver("telemetry", b'{"t_c": 1' + b"0" * 400 + b"}")
+        self.assertIsNone(self.hub.environment()["t_c"])
+        self.link.deliver("detect", b"[" * 100_000 + b"]" * 100_000)
+        self.assertIsNone(scent.parse_detect({**detect(), "gas_ohm": [10 ** 400] * 10}))
+
     def test_learns_baseline_only_from_settled_clean_air(self):
         self.link.deliver("detect", detect(gas=100, atomizer=-1))  # not settled yet
         self.assertIsNone(self.hub._baseline)
@@ -192,6 +199,16 @@ class ScentHubTests(unittest.TestCase):
         self.assertIsNone(self.hub._baseline)
         self.link.deliver("detect", detect(gas=100, atomizer=-1))
         self.assertEqual(self.hub._baseline, [100.0] * 10)
+
+    def test_partial_scan_keeps_the_baseline(self):
+        self.clock.t += scent.SETTLE_S
+        self.link.deliver("detect", detect(gas=100, atomizer=-1))
+        short = {**detect(gas=40, atomizer=-1), "gas_ohm": [40.0] * 9}
+        self.link.deliver("detect", short)
+        self.assertEqual(self.hub._baseline, [100.0] * 10)
+        for _ in range(scent.BASELINE_RESET_AFTER - 1):  # heater profile changed
+            self.link.deliver("detect", short)
+        self.assertEqual(self.hub._baseline, [40.0] * 9)
 
     def test_verify_flow(self):
         self.link.deliver("status", b"online")
@@ -214,6 +231,20 @@ class ScentHubTests(unittest.TestCase):
 
         self.hub.apply("none", 0)
         self.assertIsNone(self.hub.check())
+        # The retained result is replaced, so it can't outlive the scent.
+        self.assertEqual(self.link.sent[-1], ("verify", {"status": "off"}, True))
+
+    def test_change_replaces_the_retained_result(self):
+        self.hub.apply("lavender", 50)
+        self.hub.apply("lavender", 90)
+        leaf, published, retain = self.link.sent[-1]
+        self.assertEqual((leaf, published["status"], published["duty"], retain),
+                         ("verify", "pending", 90, True))
+
+    def test_stub_has_no_check(self):
+        hub = scent.ScentHub(scent.StubLink(), FakeClock())  # laptop: no node
+        hub.apply("lavender", 50)
+        self.assertIsNone(hub.check())
 
     def test_fails_when_node_isnt_running_the_atomizer(self):
         # e.g. pins still -1 on the node, so it rejected the command

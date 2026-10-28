@@ -49,7 +49,7 @@ Prefix `xrpod/scent/<node>/`, node `scent1` (`NODE_ID` in `config.h`,
 | `telemetry` | node → hub | 0, every 3 s | `{"t_c", "rh", "p_hpa", "iaq", "iaq_acc" (0-3), "eco2_ppm", "bvoc_ppm", "atomizer", "duty", "uptime_s"}`. Sensor fields are left out until the IAQ sensor's first reading |
 | `detect` | node → hub | 0, once per heater scan (~18 s) | `{"t_c", "rh", "p_hpa", "gas_ohm": [1-10 values, one per heater step], "probs": [4 values 0-1], "atomizer", "duty"}`. The scan sensor's own raw T/RH/P. `probs` are `BSEC_OUTPUT_GAS_ESTIMATE_1..4`, all 0 while BSEC is still collecting |
 | `cmd` | hub → node | 1 | `{"atomizer": 0\|1, "duty": 1-100, "on_s": 1-30}` or `{"atomizer": -1}` (all off) |
-| `verify` | hub → anyone | 1, retained | `{"status": "pass"\|"fail"\|"pending", "reason", "scent", "duty", "prob", "response", "expected"}` |
+| `verify` | hub → anyone | 1, retained | `{"status": "pass"\|"fail"\|"pending", "reason", "scent", "duty", "prob", "response", "expected"}`; `{"status": "off"}` once the scent stops |
 
 The hub validates every message (`parse_telemetry`, `parse_detect`): it
 rejects wrong types, NaN/inf, negative resistances and probabilities

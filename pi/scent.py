@@ -53,6 +53,7 @@ PASS_PROB = 0.6  # class probability needed to call it the right scent
 INTENSITY_PER_DUTY = 0.004  # expected gas response per duty % (0.4 at 100 %)
 STRENGTH_TOL = 0.15  # allowed +/- around the expected response
 BASELINE_ALPHA = 0.1  # how fast the clean-air baseline follows the room
+BASELINE_RESET_AFTER = 3  # scans in a row with a new step count reset it
 
 
 # ---------MESSAGE VALIDATION (never trust the network)---------
@@ -60,7 +61,11 @@ def _number(value):
     """A finite float, or None. Rejects bools, strings, NaN and inf."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
-    return float(value) if math.isfinite(value) else None
+    try:
+        value = float(value)
+    except OverflowError:  # a JSON int too big for a float
+        return None
+    return value if math.isfinite(value) else None
 
 
 def _atomizer(value):
@@ -193,7 +198,15 @@ class MqttLink:
                 c.subscribe(topic, qos=1)
 
         client.on_connect = on_connect
-        client.on_message = lambda c, u, msg: on_message(msg.topic, msg.payload)
+        # An exception here would kill paho's network thread, and with it
+        # every command and reading, so one bad message must never escape.
+        def on_msg(c, userdata, msg):
+            try:
+                on_message(msg.topic, msg.payload)
+            except Exception:
+                log.exception("scent: error handling a message on %s", msg.topic)
+
+        client.on_message = on_msg
         client.reconnect_delay_set(1, 30)
         client.connect_async(self.host, self.port, keepalive=30)
         client.loop_start()
@@ -232,7 +245,7 @@ def decode(payload):
     """JSON from an MQTT payload, or None."""
     try:
         return json.loads(payload)
-    except ValueError:  # includes bad UTF-8
+    except (ValueError, RecursionError):  # bad JSON or UTF-8, absurd nesting
         return None
 
 
@@ -252,6 +265,7 @@ class ScentHub:
         self._telemetry = None  # (time, reading)
         self._detect_at = None
         self._baseline = None
+        self._baseline_misses = 0
         self._check = None
         # is_stub = no node configured (laptop testing), so fake data is OK.
         self.is_stub = isinstance(self.link, StubLink)
@@ -278,13 +292,15 @@ class ScentHub:
                     log.info("scent: %s at %s%%", scent, intensity)
                 self.active, self.intensity = scent, intensity
                 self._changed_at = now
-                self._check = {"status": "pending", "reason": "settling", "scent": scent,
-                               "duty": intensity}
+                self._check = pending = {"status": "pending", "reason": "settling",
+                                         "scent": scent, "duty": intensity}
             if not changed and now - self._sent_at < CMD_REFRESH_S:
                 return
             self._sent_at = now
         # The node turns any other atomizer off first.
         self._send({"atomizer": SCENT_ATOMIZERS[scent], "duty": intensity, "on_s": MAX_ON_S})
+        if changed:  # replace the retained result of the previous run
+            self.link.publish(TOPIC.format("verify"), pending, retain=True)
 
     def off(self):
         now = self.clock()
@@ -299,6 +315,8 @@ class ScentHub:
             self._check = None
             self._sent_at = now
         self._send({"atomizer": -1})
+        if was_on:  # so the retained result doesn't outlive the scent
+            self.link.publish(TOPIC.format("verify"), {"status": "off"}, retain=True)
 
     def _send(self, cmd):
         # Not connected yet (e.g. at boot) or just dropped: retry next tick
@@ -342,7 +360,7 @@ class ScentHub:
                 return
             if self.active == "none":
                 if detect["atomizer"] == -1:
-                    self._baseline = update_baseline(self._baseline, detect["gas_ohm"])
+                    self._learn_baseline(detect["gas_ohm"])
                 return
             if detect["atomizer"] != SCENT_ATOMIZERS[self.active]:
                 check = {"status": "fail", "scent": self.active, "duty": self.intensity,
@@ -353,6 +371,16 @@ class ScentHub:
                 log.info("scent check: %s %s", check["status"], check["reason"])
             self._check = check
         self.link.publish(TOPIC.format("verify"), check, retain=True)
+
+    def _learn_baseline(self, gas):
+        # One scan with a different step count is a partial scan; only a run
+        # of them means the node's heater profile really changed.
+        if self._baseline is not None and len(gas) != len(self._baseline):
+            self._baseline_misses += 1
+            if self._baseline_misses < BASELINE_RESET_AFTER:
+                return
+        self._baseline_misses = 0
+        self._baseline = update_baseline(self._baseline, gas)
 
     # ---------------------------------------------------- for hardware.py
     def environment(self):
@@ -365,7 +393,7 @@ class ScentHub:
     def check(self):
         """Latest verify result for the running scent, or None when off."""
         with self._lock:
-            if self.active == "none":
+            if self.active == "none" or self.is_stub:  # stub: no node to check
                 return None
             now = self.clock()
             if not self._online:

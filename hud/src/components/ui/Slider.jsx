@@ -11,8 +11,10 @@ const THUMB_PX = 28;
  *
  * Pointer dragging is handled here rather than by the browser: the pointer
  * is captured on press and the value is computed from its X position, so the
- * thumb follows the mouse/finger exactly and the drag can't be cancelled by
- * the page scrolling. Keyboard input still uses the native control.
+ * thumb follows the mouse/finger exactly. A vertical swipe still scrolls the
+ * page (touch-action: pan-y); the browser then cancels the pointer and the
+ * value is dropped, so scrolling past a slider never changes a setting.
+ * Keyboard input still uses the native control.
  */
 export function Slider({
   label,
@@ -76,11 +78,23 @@ export function Slider({
     if (dragging.current) show(valueAt(e.clientX));
   };
 
-  // Release, cancel and lost capture all end the drag; save where it stopped
+  // Release, lost capture and blur end the drag and save where it stopped,
   // so the slider never stays stuck in "dragging" and ignoring updates.
   const endDrag = () => {
     if (dragging.current) commit();
   };
+
+  // The browser took the touch for a page scroll, or the slider got disabled
+  // mid-drag: drop the value instead of saving it.
+  const cancelDrag = () => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    show(latest.current.value);
+  };
+
+  useEffect(() => {
+    if (disabled) cancelDrag();
+  }, [disabled]);
 
   // Keyboard (arrows, Home/End, PageUp/Down) goes through the native
   // `change` event, which fires once the value is set.
@@ -119,8 +133,9 @@ export function Slider({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerCancel={cancelDrag}
         onLostPointerCapture={endDrag}
+        onBlur={endDrag}
         onKeyUp={() => commit(Number(inputRef.current.value))}
         className={`hud-range hud-range--${accent}`}
         style={{ "--fill": `${pct}%` }}
