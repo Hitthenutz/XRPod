@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { AirflowCard } from "@/components/AirflowCard";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ReadoutsPanel } from "@/components/ReadoutsPanel";
 import { ScentCard } from "@/components/ScentCard";
@@ -49,14 +50,24 @@ export default function App() {
           </div>
         )}
 
-        <ReadoutsPanel reading={reading} loading={readingLoading} />
+        <ErrorBoundary label="Live readouts">
+          <ReadoutsPanel reading={reading} loading={readingLoading} />
+        </ErrorBoundary>
 
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TemperatureCard settings={settings} onChange={applyChanges} />
-            <AirflowCard settings={settings} onChange={applyChanges} />
-            <ScentCard settings={settings} reading={reading} onChange={applyChanges} />
-            <HistoryPanel />
+            <ErrorBoundary label="Temperature controls">
+              <TemperatureCard settings={settings} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Airflow controls">
+              <AirflowCard settings={settings} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="Scent controls">
+              <ScentCard settings={settings} reading={reading} onChange={applyChanges} />
+            </ErrorBoundary>
+            <ErrorBoundary label="History">
+              <HistoryPanel />
+            </ErrorBoundary>
           </div>
         ) : (
           !error && (
