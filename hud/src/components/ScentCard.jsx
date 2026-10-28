@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { CircleCheck, CircleX, Loader2, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Slider } from "@/components/ui/Slider";
 import { SCENTS } from "@/lib/podSettings";
@@ -7,12 +7,30 @@ const SCENT_SWATCH = {
   none: "bg-slate-500",
   lavender: "bg-violet-400",
   pine: "bg-emerald-500",
-  citrus: "bg-amber-400",
-  ocean: "bg-cyan-400",
-  rain: "bg-indigo-400",
 };
 
-export function ScentCard({ settings, onChange }) {
+// The Pi's check that the right scent arrived at the right strength.
+const CHECK_STYLE = {
+  pass: { Icon: CircleCheck, label: "Verified", tone: "text-emerald-300" },
+  fail: { Icon: CircleX, label: "Check failed", tone: "text-red-300" },
+  pending: { Icon: Loader2, label: "Checking", tone: "text-slate-400", spin: true },
+};
+
+function ScentCheck({ check }) {
+  if (!check) return null;
+  const { Icon, label, tone, spin } = CHECK_STYLE[check.status] ?? CHECK_STYLE.pending;
+  return (
+    <p className={`flex items-start gap-2 text-sm ${tone}`} aria-live="polite">
+      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${spin ? "animate-spin" : ""}`} aria-hidden />
+      <span>
+        {label}
+        {check.reason && <span className="text-slate-400"> · {check.reason}</span>}
+      </span>
+    </p>
+  );
+}
+
+export function ScentCard({ settings, reading, onChange }) {
   const off = settings.selected_scent === "none";
   return (
     <Card title="Scent" icon={Sparkles}>
@@ -47,6 +65,10 @@ export function ScentCard({ settings, onChange }) {
           disabled={off}
           onCommit={(v) => onChange({ scent_intensity_pct: v })}
         />
+        {/* Readings lag a tick behind a change; don't show the old scent's result. */}
+        {!off && reading?.scent_check?.scent === settings.selected_scent && (
+          <ScentCheck check={reading.scent_check} />
+        )}
       </div>
     </Card>
   );

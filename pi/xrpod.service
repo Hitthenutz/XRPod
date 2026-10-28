@@ -11,8 +11,10 @@
 
 [Unit]
 Description=XRPod pod controller and HUD
-After=network-online.target
-Wants=network-online.target
+# Mosquitto carries the scent / IAQ node's data; start after it. Wants= (not
+# Requires=) so the HUD still runs if the broker is broken.
+After=network-online.target mosquitto.service
+Wants=network-online.target mosquitto.service
 
 [Service]
 User=pi
@@ -25,8 +27,11 @@ RestartSec=3
 Environment=HUD_PORT=80
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
-# Uncomment once the scent machine is wired up:
-# Environment=SCENT_HARDWARE=gpio
+# Scent / IAQ node over MQTT (see subsystems/iaq/README.md). Without MQTT_HOST the
+# scent hub is a stub. /etc/xrpod.env holds MQTT_USER and MQTT_PASS
+# (chmod 600, never in git); the leading "-" means it's optional.
+Environment=MQTT_HOST=127.0.0.1
+EnvironmentFile=-/etc/xrpod.env
 
 [Install]
 WantedBy=multi-user.target

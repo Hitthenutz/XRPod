@@ -55,7 +55,7 @@ export default function App() {
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <TemperatureCard settings={settings} onChange={applyChanges} />
             <AirflowCard settings={settings} onChange={applyChanges} />
-            <ScentCard settings={settings} onChange={applyChanges} />
+            <ScentCard settings={settings} reading={reading} onChange={applyChanges} />
             <HistoryPanel />
           </div>
         ) : (

@@ -5,7 +5,7 @@ XRPod pod controller. Runs on the Raspberry Pi 5 and does everything:
   * serves the HUD website and its API on the local network (web.py),
   * stores settings, readings and change history in SQLite (store.py),
   * every CONTROL_SECONDS reads the sensors and drives the heater, AC, fan
-    and scent machine to match the settings (hardware.py, scent.py).
+    and scent node to match the settings (hardware.py, scent.py).
 
 Run it:
     cd hud && npm run build    # once: builds the HUD into hud/dist/
@@ -20,11 +20,14 @@ Settings (environment variables):
   XRPOD_DB          database file (default xrpod.db next to this script)
   XRPOD_STATIC_DIR  built HUD (default ../hud/dist)
   CONTROL_SECONDS   sensor/control loop interval (default 2)
-  SCENT_HARDWARE    set to "gpio" to drive the scent machine's real pins
+  MQTT_HOST         Mosquitto broker for the scent / IAQ node, e.g. 127.0.0.1
+                    (unset = stub, no node)
+  MQTT_PORT         default 1883
+  MQTT_USER, MQTT_PASS  broker login (keep them in /etc/xrpod.env, not here)
   LOG_LEVEL         e.g. DEBUG
 
-Uses only the Python standard library (plus RPi.GPIO, which Raspberry Pi OS
-ships with, once you drive real pins).
+Uses the Python standard library, plus python3-paho-mqtt (apt) for the scent
+node and RPi.GPIO (ships with Raspberry Pi OS) once you drive real pins.
 """
 
 import logging

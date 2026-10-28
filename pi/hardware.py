@@ -1,9 +1,10 @@
 """
 XRPod hardware: sensors and actuators on the Raspberry Pi.
 
-Everything here is a STUB until you fill in the TODO(hardware) parts, so the
-whole system runs on a laptop for testing. scent.py (the scent machine) is
-already wired up; set SCENT_HARDWARE=gpio to drive its real pins.
+Heater, AC and fan are STUBS until you fill in the TODO(hardware) parts, so
+the whole system runs on a laptop for testing. Scent and the air sensors
+live on the ESP32 scent / IAQ node; scent.py talks to it over MQTT once
+MQTT_HOST is set.
 
 Safety rules this module enforces no matter what the HUD asks for:
   * the heater and AC never run at the same time,
@@ -14,7 +15,7 @@ Safety rules this module enforces no matter what the HUD asks for:
 import logging
 import random
 
-from scent import ScentController
+from scent import ScentHub
 
 log = logging.getLogger("xrpod.hardware")
 
@@ -24,7 +25,7 @@ state = {
     "heater_running": False,
     "fan_pct": 0,
 }
-scent_machine = None  # ScentController, created in setup()
+scent_hub = None  # ScentHub, created in setup()
 
 
 def setup():
@@ -39,9 +40,9 @@ def setup():
         fan_pwm = GPIO.PWM(FAN_PWM_PIN, 25_000); fan_pwm.start(0)
         dht = adafruit_dht.DHT22(board.D4)
     """
-    global scent_machine
-    log.info("hardware: using STUBS for heater/AC/fan/sensors")
-    scent_machine = ScentController()
+    global scent_hub
+    log.info("hardware: using STUBS for heater/AC/fan")
+    scent_hub = ScentHub()
 
 
 def cleanup():
@@ -52,32 +53,49 @@ def cleanup():
     set_heater_relay(False)
     set_ac_relay(False)
     set_fan_pwm(0)
-    if scent_machine:
-        scent_machine.close()
+    if scent_hub:
+        scent_hub.close()
     log.info("hardware: all outputs off")
 
 
 # --------------------------------------------------------------------------
-# Sensors (STUB)
+# Sensors (temperature, humidity and air quality come from the scent node)
 # --------------------------------------------------------------------------
+def _rounded(value, digits):
+    return round(value, digits) if isinstance(value, float) else None
+
+
 def read_sensors():
     """Return one reading (same fields the HUD's live readouts show).
 
-    TODO(hardware): replace the fake numbers below with real reads, e.g.
-        temp_c = dht.temperature; humidity = dht.humidity
-        fan_rpm = read_tach_rpm(FAN_TACH_PIN)
+    Temperature, humidity and IAQ come from the scent node's IAQ sensor.
+    Without a node (stub link, laptop testing) temperature and humidity are
+    fake; with a real node that has gone quiet they're None.
+
+    TODO(hardware): fan_rpm = read_tach_rpm(FAN_TACH_PIN)
     """
-    fake_temp_f = 70.0 + random.uniform(-1.5, 1.5)  # noqa: S311 - stub data
-    fake_humidity = 45.0 + random.uniform(-3, 3)  # noqa: S311
+    env = (scent_hub.environment() if scent_hub else None) or {}
+    if env or (scent_hub and not scent_hub.is_stub):
+        temp_c, humidity = env.get("t_c"), env.get("rh")
+        temp_f = temp_c * 9 / 5 + 32 if temp_c is not None else None
+    else:
+        temp_f = 70.0 + random.uniform(-1.5, 1.5)  # noqa: S311 - stub data
+        humidity = 45.0 + random.uniform(-3, 3)  # noqa: S311
     fake_rpm = state["fan_pct"] * 30 + random.uniform(-20, 20) if state["fan_pct"] else 0  # noqa: S311
 
     return {
-        "actual_temp_f": round(fake_temp_f, 1),
-        "actual_humidity_pct": round(fake_humidity, 1),
+        "actual_temp_f": _rounded(temp_f, 1),
+        "actual_humidity_pct": _rounded(humidity, 1),
+        "pressure_hpa": _rounded(env.get("p_hpa"), 1),
+        "iaq": _rounded(env.get("iaq"), 0),
+        "iaq_accuracy": env.get("iaq_acc"),
+        "eco2_ppm": _rounded(env.get("eco2_ppm"), 0),
+        "bvoc_ppm": _rounded(env.get("bvoc_ppm"), 2),
         "ac_running": state["ac_running"],
         "heater_running": state["heater_running"],
         "fan_rpm": max(0, round(fake_rpm)),
-        "scent_active": scent_machine.active if scent_machine else "none",
+        "scent_active": scent_hub.active if scent_hub else "none",
+        "scent_check": scent_hub.check() if scent_hub else None,
     }
 
 
@@ -131,7 +149,7 @@ def apply_settings(settings):
     set_fan_pwm(to_pct(settings.get("fan_speed_pct")))
 
     scent = settings.get("selected_scent")
-    scent_machine.apply(
+    scent_hub.apply(
         scent if isinstance(scent, str) else "none",
         to_pct(settings.get("scent_intensity_pct")),
     )

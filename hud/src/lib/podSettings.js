@@ -1,4 +1,6 @@
-export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
+// One per atomizer on the scent node; mirrors SCENTS in pi/store.py.
+// ---------MISSING: FINAL SCENT NAMES (placeholders)---------
+export const SCENTS = ["none", "lavender", "pine"];
 
 // Mirrors DEFAULT_SETTINGS in pi/store.py, which owns the real values.
 export const DEFAULT_SETTINGS = {

@@ -11,8 +11,14 @@ required.
  │  HUD in browser  │ ─ local Wi-Fi ──▶ │ web.py      serves the HUD + JSON API     │
  │  (home screen)   │ ◀─ live events ── │ store.py    settings, readings, history   │
  └──────────────────┘                   │             in SQLite (xrpod.db)         │
-                                        │ hardware.py heater, AC, fan, sensors     │
- Unity (VR) ── same API ──────────────▶ │ scent.py    scent machine                │
+                                        │ hardware.py heater, AC, fan, readings    │
+ Unity (VR) ── same API ──────────────▶ │ scent.py    scent hub                    │
+                                        └─────────────────────┬────────────────────┘
+                                                              │ MQTT over Wi-Fi (Mosquitto)
+                                        ┌─────────────────────┴────────────────────┐
+                                        │ ESP32 scent / IAQ node (subsystems/iaq/) │
+                                        │ 2x BME688: temp, humidity, IAQ, scents   │
+                                        │ 2 atomizers                              │
                                         └──────────────────────────────────────────┘
 ```
 
@@ -33,9 +39,15 @@ pi/                      # Runs on the Raspberry Pi
 ├── web.py               # HTTP server: HUD files, API, live events
 ├── store.py             # SQLite storage + validation of every change
 ├── hardware.py          # Sensors and actuators (stubbed until wired up)
-├── scent.py             # Scent machine (one cartridge at a time + intensity PWM)
+├── scent.py             # Scent hub: talks MQTT to the scent / IAQ node
+├── tools/record.py      # Record node data to CSV (training, calibration)
 ├── tests/               # Tests (run in CI)
+├── mosquitto.conf       # MQTT broker settings
 └── xrpod.service        # systemd unit: start on boot
+subsystems/              # One folder per pod subsystem (ESP32 firmware, docs)
+├── iaq/                 # Scent / indoor air quality node
+├── thermal/             # Heater and AC
+└── airflow/             # Fan
 unity/                   # The VR project (Unity, assets in Git LFS)
 .github/workflows/       # CI: build, tests, security checks
 ```
@@ -114,26 +126,25 @@ to reset everything to defaults.
 
 ### Hardware
 
-Everything is stubbed until you fill in the `TODO(hardware)` parts of
-`pi/hardware.py` (heater relay, AC relay, fan PWM, temperature and
-humidity sensor) and set the pin numbers at the top of `pi/scent.py`.
+Heater, AC and fan are stubbed until you fill in the `TODO(hardware)`
+parts of `pi/hardware.py`. Temperature, humidity, air quality (IAQ, eCO₂,
+bVOC) and scent come from the ESP32 scent / IAQ node over MQTT; see
+[`subsystems/iaq/README.md`](subsystems/iaq/README.md) to build it and set
+up Mosquitto. Without the node (no `MQTT_HOST`), temperature and humidity
+are fake so the HUD still works on a laptop. Each subsystem's own folder
+under [`subsystems/`](subsystems/README.md) says where its code goes.
 
 Safety rules the Pi enforces no matter what any client sends:
 
 - the heater and AC never run together,
 - percentages are clamped to 0–100 and junk values mean off,
-- only one scent cartridge is ever on,
+- only one atomizer is ever on, and each command runs at most 30 s unless
+  the Pi renews it,
 - when the service stops, every output turns off.
 
-Bench-test the scent machine on its own:
-
-```bash
-cd pi
-python3 scent.py lavender 60                         # stub: logs only
-SCENT_HARDWARE=gpio python3 scent.py lavender 60 10  # real pins for 10 s
-```
-
-Then uncomment `SCENT_HARDWARE=gpio` in `pi/xrpod.service`.
+After a scent change, the Pi checks with the node's scent sensor that the
+right scent arrived at about the right strength. The result shows under
+the scent slider in the HUD.
 
 ## Install on a phone or tablet
 

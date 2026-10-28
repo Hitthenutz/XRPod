@@ -1,4 +1,4 @@
-import { Droplets, Fan, Flame, Snowflake, Thermometer } from "lucide-react";
+import { Droplets, Fan, Flame, Gauge, Leaf, Snowflake, Thermometer, Wind } from "lucide-react";
 import { timeAgo, useNow } from "@/lib/time";
 
 // If the Pi hasn't reported in this long, flag the readings as stale.
@@ -45,6 +45,19 @@ function RunningPill({ icon: Icon, label, running, color }) {
 const fmt = (n, digits = 1) =>
   typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "--";
 
+// Bosch's IAQ scale (0-500) and what its accuracy flag means.
+function iaqLabel(iaq) {
+  if (typeof iaq !== "number") return null;
+  if (iaq <= 50) return "Excellent";
+  if (iaq <= 100) return "Good";
+  if (iaq <= 150) return "Lightly polluted";
+  if (iaq <= 200) return "Moderately polluted";
+  if (iaq <= 250) return "Heavily polluted";
+  if (iaq <= 350) return "Severely polluted";
+  return "Extremely polluted";
+}
+const IAQ_ACCURACY = ["calibrating", "low accuracy", "medium accuracy", "calibrated"];
+
 export function ReadoutsPanel({ reading, loading }) {
   const now = useNow(5000);
   const lastAt = reading?.created_date ? new Date(reading.created_date).getTime() : null;
@@ -83,6 +96,19 @@ export function ReadoutsPanel({ reading, loading }) {
           value={fmt(reading?.actual_humidity_pct, 0)}
           unit="%"
         />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Stat
+          icon={Leaf}
+          label="Air quality"
+          value={fmt(reading?.iaq, 0)}
+          sub={[iaqLabel(reading?.iaq), IAQ_ACCURACY[reading?.iaq_accuracy]]
+            .filter(Boolean)
+            .join(" · ")}
+        />
+        <Stat icon={Wind} label="eCO₂" value={fmt(reading?.eco2_ppm, 0)} unit="ppm" />
+        <Stat icon={Gauge} label="bVOC" value={fmt(reading?.bvoc_ppm, 2)} unit="ppm" />
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

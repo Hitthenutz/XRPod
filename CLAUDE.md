@@ -3,8 +3,9 @@
 XRPod is a manual control HUD for a senior design capstone pod. The Raspberry
 Pi 5 hosts everything: a Python server (standard library only) serves the HUD
 (Vite + React + Tailwind) and its JSON API, stores data in SQLite and drives
-the hardware. There's no cloud backend. A Unity VR scene talks to the same
-API. See README.md for setup and how the pieces fit together.
+the hardware. An ESP32 scent / IAQ node (two BME688s, two atomizers) talks
+to it over MQTT. There's no cloud backend. A Unity VR scene talks to the
+same API. See README.md for setup and how the pieces fit together.
 
 ## Layout
 
@@ -15,9 +16,20 @@ API. See README.md for setup and how the pieces fit together.
   - `agent.py`: entry point, starts the web server and control loop
   - `web.py`: HTTP server (HUD files from `hud/dist`, `/api/*`, Server-Sent Events)
   - `store.py`: SQLite storage and validation of every settings change
-  - `hardware.py`: sensors and actuators; `scent.py`: scent machine
+  - `hardware.py`: sensors and actuators; `scent.py`: scent hub (MQTT to
+    the scent / IAQ node)
+  - `tools/record.py`: records node data to CSV for training/calibration
   - `tests/`: tests, run in CI
-  - `xrpod.service`: systemd unit for the Pi
+  - `xrpod.service`: systemd unit for the Pi; `mosquitto.conf`: broker
+- `subsystems/`: one folder per pod subsystem, each owning its ESP32
+  firmware (`firmware/`), docs (`docs/`) and a README. Layout rules:
+  `subsystems/README.md`.
+  - `iaq/`: the scent / IAQ node. `firmware/scent-node/` is its PlatformIO
+    project, and `docs/DESIGN.md` has the MQTT contract and the MISSING
+    hardware list. Rules and verify commands:
+    `.claude/skills/xrpod-scent/SKILL.md`.
+  - `thermal/` (heater, AC) and `airflow/` (fan): placeholders until their
+    owners add firmware.
 - `unity/`: the Unity VR project root (`Assets/`, `Packages/`,
   `ProjectSettings/`). Own scripts and assets go under `unity/Assets/XRPod/`;
   Pi API client code in `unity/Assets/XRPod/Scripts/PodLink/`. See
@@ -33,6 +45,8 @@ cd hud && npm run build                     # must pass; CI runs it
 python3 -m unittest discover -s pi/tests -v # must pass; CI runs it
 python3 pi/agent.py                         # run everything at :8080 (stub hardware)
 cd hud && npm run dev                       # HUD hot reload; /api proxied to :8080
+cd subsystems/iaq/firmware/scent-node && pio run       # node firmware: must be 0 warnings
+cd subsystems/iaq/firmware/scent-node && sh test/host/run.sh  # atomizer host test
 ```
 
 ## Git and commits
@@ -58,15 +72,18 @@ cd hud && npm run dev                       # HUD hot reload; /api proxied to :8
   `usePodSettings.js`, so it's saved optimistically. The Pi logs history (one
   row per changed field) in `Store.update_settings()`; don't write settings
   any other way.
-- `pi/` stays standard-library Python (plus `RPi.GPIO` on the Pi). Ask
-  before adding pip packages.
+- `pi/` stays standard-library Python, plus `RPi.GPIO` and
+  `python3-paho-mqtt` (both apt) on the Pi. paho is imported only inside
+  `MqttLink.start()`, so CI and laptops don't need it. Ask before adding
+  pip packages.
 - Heater and AC must stay mutually exclusive in the HUD, in
   `validate_patch()` (store.py) and in `apply_settings()` (hardware.py).
 - If you change a settings field or default, update `SETTINGS_SCHEMA` and
   `DEFAULT_SETTINGS` in `pi/store.py` and `DEFAULT_SETTINGS` in
   `hud/src/lib/podSettings.js`, and any Unity code that reads or sends it.
   A new scent also goes in `SCENTS` (store.py), `SCENTS` (podSettings.js)
-  and `CARTRIDGE_PINS` (scent.py).
+  and `SCENT_ATOMIZERS` + `CLASS_NAMES` (scent.py), and needs an atomizer
+  on the node.
 - Unity talks to the Pi only through the HTTP API in `pi/web.py`; no other
   channel to the hardware. Keep the API table in README.md current.
 
@@ -83,8 +100,13 @@ cd hud && npm run dev                       # HUD hot reload; /api proxied to :8
 
 ## Security rules
 
-- **Never commit secrets** (API keys, tokens, Wi-Fi passwords, `.env` files)
-  or the Pi's database (`pi/*.db`, git-ignored).
+- **Never commit secrets** (API keys, tokens, Wi-Fi or MQTT passwords,
+  `.env` files, the node's `include/secrets.h`) or the Pi's database
+  (`pi/*.db`, git-ignored). MQTT logins on the Pi live in
+  `/etc/xrpod.env` and `/etc/mosquitto/xrpod.passwd`, never in the repo.
+- **The MQTT broker needs a login** (`allow_anonymous false` in
+  `pi/mosquitto.conf`). Anyone who can publish to `xrpod/scent/+/cmd` can
+  run the atomizers.
 - **The HUD is LAN-only with no login.** Anyone on the pod's Wi-Fi can change
   settings; that's a known, accepted risk for now. Don't expose it to the
   internet (no port forwarding); remote access should go through something
@@ -97,8 +119,10 @@ cd hud && npm run dev                       # HUD hot reload; /api proxied to :8
   than clamping them silently.
 - **The Pi must fail safe.** Never let a bad value drive the hardware: clamp
   percentages to 0–100 in `hardware.py`, never run the heater and AC
-  together, only one scent cartridge on at a time, and every output off when
-  the service stops.
+  together, only one atomizer on at a time, and every output off when the
+  service stops. The scent node keeps its own fail-safes (off at boot, off
+  when MQTT drops, every command capped at `MAX_ON_S`); see
+  `subsystems/iaq/docs/DESIGN.md`.
 - **Pin GitHub Actions to a full commit SHA**, with the version in a comment
   (`uses: owner/action@<40-char sha> # v1.2.3`), never a tag like `@v4`.
   Tags can be moved to point at new code. Dependabot updates the pins.

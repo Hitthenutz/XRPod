@@ -14,7 +14,9 @@ import threading
 import time
 from datetime import datetime, timezone
 
-SCENTS = ("none", "lavender", "pine", "citrus", "ocean", "rain")
+# One per atomizer on the scent node; mirrors SCENT_ATOMIZERS in scent.py.
+# ---------MISSING: FINAL SCENT NAMES (placeholders)---------
+SCENTS = ("none", "lavender", "pine")
 
 # field -> (kind, min, max). Mirrors src/lib/podSettings.js.
 SETTINGS_SCHEMA = {
