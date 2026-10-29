@@ -34,7 +34,7 @@ if (Test-Path $co) {
     '# To make it required, turn on "Require review from Code Owners" in the',
     '# main branch rules (GitHub > Settings > Rules or Branches).',
     '# Add teammates'' folders below as they claim them, e.g.',
-    '# /pi-agent/ @their-github-username',
+    '# /pi/ @their-github-username',
     '',
     '/esp32/scent-node/ @Hitthenutz'
   ) -join "`n"

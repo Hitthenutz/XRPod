@@ -1,7 +1,7 @@
 # systemd service: starts the XRPod controller + HUD on boot and restarts it
 # if it crashes. Install on the Pi (see README "Run it on the Pi"):
 #
-#   sudo cp pi-agent/xrpod.service /etc/systemd/system/
+#   sudo cp pi/xrpod.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now xrpod
 #   journalctl -u xrpod -f          # live logs
@@ -17,7 +17,7 @@ Wants=network-online.target
 [Service]
 User=pi
 WorkingDirectory=/home/pi/XRPod
-ExecStart=/usr/bin/python3 /home/pi/XRPod/pi-agent/agent.py
+ExecStart=/usr/bin/python3 /home/pi/XRPod/pi/agent.py
 Restart=on-failure
 RestartSec=3
 

@@ -15,7 +15,7 @@ constexpr int8_t kNoScent = -1;
 // One scent cartridge and the GPIO pins of its diffusers (atomizers).
 // Only the first `diffusersPerSlot` pins are used; the rest are ignored.
 struct ScentSlot {
-  const char *name;  // must match SCENTS in pi-agent/store.py
+  const char *name;  // must match SCENTS in pi/store.py
   uint8_t pins[kMaxDiffusersPerSlot];
 };
 
@@ -35,7 +35,7 @@ struct IaqReading {
   float gasOhms;  // MOX gas resistance; drops when VOCs (scent) are present
 };
 
-// Same rule as to_pct() in pi-agent/hardware.py: anything that isn't a
+// Same rule as to_pct() in pi/hardware.py: anything that isn't a
 // finite number becomes 0 (off); otherwise truncate and clamp to 0-100.
 inline uint8_t clampPct(double v) {
   if (isnan(v) || isinf(v) || v <= 0) return 0;
