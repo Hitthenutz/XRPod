@@ -1,0 +1,28 @@
+<!--
+  Runs the VR Core logic without Unity. It compiles the same .cs files Unity
+  uses (Assets/XRPod/Scripts/Core), so a passing test here is testing the
+  real code. No NuGet packages.
+
+  LangVersion 9 matches Unity 6, so Core can't accidentally use C# features
+  Unity doesn't support.
+
+  Run it from the repo root (commands in unity/docs/UNITY_SETUP.md, step 0):
+  "dotnet run" with this project runs the tests; add the "demo" argument
+  for a narrated walkthrough.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../Assets/XRPod/Scripts/Core/**/*.cs" Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

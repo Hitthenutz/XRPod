@@ -1,0 +1,6 @@
+bin/
+obj/
+
+# unity/.gitignore ignores *.csproj (Unity regenerates its own); this one
+# is hand-written and needed to run the tests.
+!XRPod.VR.OfflineTests.csproj
