@@ -1,4 +1,4 @@
-// Drives the diffusers. Same safety rules as pi-agent/scent.py:
+// Drives the diffusers. Same safety rules as pi/scent.py:
 //   * only one scent cartridge is ever on (break before make),
 //   * intensity is clamped 0-100 and anything invalid means off,
 //   * off() turns every output off.

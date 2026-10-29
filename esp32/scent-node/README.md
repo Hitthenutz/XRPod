@@ -48,7 +48,7 @@ Same field names as the Pi's settings, so `hardware.py` can forward them:
 **The Pi must resend the command at least every 15 s** (its 2 s control loop
 is fine). If it stops, the node turns everything off.
 
-## Safety rules (match pi-agent/scent.py)
+## Safety rules (match pi/scent.py)
 
 - Only one scent is ever on; switching turns the old one off first.
 - Intensity is clamped 0-100; unknown scents, strings, booleans, null mean off.
@@ -79,4 +79,4 @@ affects it too. Upgrade to Bosch BSEC2 for proper IAQ / bVOC values later.
 - Confirm the Starry modules mist when powered; if they need a button press,
   drive the button instead of the power.
 - 10k pull-down on each MOSFET gate.
-- Match the scent names in `config.h` to `SCENTS` in `pi-agent/store.py`.
+- Match the scent names in `config.h` to `SCENTS` in `pi/store.py`.

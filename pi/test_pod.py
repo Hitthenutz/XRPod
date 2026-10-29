@@ -1,6 +1,6 @@
 """Tests for the Pi side. Run from the repo root:
 
-    python3 -m unittest discover -s pi-agent -v
+    python3 -m unittest discover -s pi -v
 
 Covers the safety rules (heater/AC exclusion, junk values, one scent at a
 time), settings validation and history, and the web server's protections.

@@ -8,8 +8,8 @@ XRPod pod controller. Runs on the Raspberry Pi 5 and does everything:
     and scent machine to match the settings (hardware.py, scent.py).
 
 Run it:
-    npm run build              # once, from the repo root: builds the HUD into dist/
-    python3 pi-agent/agent.py  # then open http://<pi-address>:8080
+    cd hud && npm run build    # once: builds the HUD into hud/dist/
+    python3 pi/agent.py        # then open http://<pi-address>:8080
 
 It also runs on a laptop with stubbed hardware, which is the easiest way to
 test the HUD.
@@ -18,7 +18,7 @@ Settings (environment variables):
   HUD_HOST          address to listen on (default 0.0.0.0 = whole network)
   HUD_PORT          port (default 8080)
   XRPOD_DB          database file (default xrpod.db next to this script)
-  XRPOD_STATIC_DIR  built HUD (default ../dist)
+  XRPOD_STATIC_DIR  built HUD (default ../hud/dist)
   CONTROL_SECONDS   sensor/control loop interval (default 2)
   SCENT_HARDWARE    set to "gpio" to drive the scent machine's real pins
   LOG_LEVEL         e.g. DEBUG
@@ -42,7 +42,7 @@ HERE = Path(__file__).resolve().parent
 HUD_HOST = os.environ.get("HUD_HOST", "0.0.0.0")  # noqa: S104 - LAN server by design
 HUD_PORT = int(os.environ.get("HUD_PORT", "8080"))
 DB_PATH = os.environ.get("XRPOD_DB", str(HERE / "xrpod.db"))
-STATIC_DIR = os.environ.get("XRPOD_STATIC_DIR", str(HERE.parent / "dist"))
+STATIC_DIR = os.environ.get("XRPOD_STATIC_DIR", str(HERE.parent / "hud" / "dist"))
 CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "2"))
 
 log = logging.getLogger("xrpod")

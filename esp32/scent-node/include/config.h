@@ -7,7 +7,7 @@
 namespace cfg {
 
 // ---- Scents ---------------------------------------------------------------
-// Names must match SCENTS in pi-agent/store.py. 3 scents x 2 diffusers.
+// Names must match SCENTS in pi/store.py. 3 scents x 2 diffusers.
 // Each pin drives a logic-level N-MOSFET (low-side) switching one 5 V USB
 // atomizer. Put a 10k pull-down on each gate so outputs stay off at boot.
 // Pins avoid ESP32 strapping pins (0, 2, 5, 12, 15), flash pins (6-11) and

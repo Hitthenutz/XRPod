@@ -1,4 +1,4 @@
-// Client for the API served by the Pi (pi-agent/web.py). The HUD is served
+// Client for the API served by the Pi (pi/web.py). The HUD is served
 // from the same Pi, so every path is relative; in development Vite proxies
 // /api to the Pi (see vite.config.js).
 
