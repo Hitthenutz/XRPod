@@ -1,0 +1,18 @@
+{
+  "folders": [
+    { "name": "scent-node (ESP32)", "path": "scent-node" },
+    { "name": "XRPod repo", "path": ".." }
+  ],
+  "settings": {
+    "git.openRepositoryInParentFolders": "always",
+    "files.exclude": { "**/.pio": true }
+  },
+  "extensions": {
+    "recommendations": [
+      "platformio.platformio-ide",
+      "ms-vscode.cpptools",
+      "github.vscode-pull-request-github",
+      "eamodio.gitlens"
+    ]
+  }
+}
