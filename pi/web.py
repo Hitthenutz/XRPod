@@ -6,8 +6,10 @@ API (all JSON):
   PATCH /api/settings          change some settings, e.g. {"fan_speed_pct": 40}
   GET   /api/readings/latest   newest sensor reading (or null)
   GET   /api/history?limit=50  newest settings changes first
+  GET   /api/vr/state          what the headset last reported (or null)
+  PUT   /api/vr/state          headset reports its environment and zone
   GET   /api/events            Server-Sent Events stream: "settings",
-                               "reading" and "history" events, live
+                               "reading", "history" and "vr" events, live
 
 Everything else serves the built HUD from ../hud/dist (run `npm run build` in hud/).
 
@@ -29,6 +31,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from store import ValidationError
+from vr import VrState
 
 log = logging.getLogger("xrpod.web")
 
@@ -76,7 +79,7 @@ class EventHub:
 
 class Handler(BaseHTTPRequestHandler):
     """Routes requests. Shared state lives on the server: pod_store, pod_hub,
-    pod_static_root and pod_on_settings_changed (see start_server)."""
+    pod_vr, pod_static_root and pod_on_settings_changed (see start_server)."""
 
     server_version = "XRPod"
     protocol_version = "HTTP/1.1"
@@ -105,6 +108,28 @@ class Handler(BaseHTTPRequestHandler):
             return True
         return urlsplit(origin).netloc == self.headers.get("Host")
 
+    def _read_json_body(self):
+        """Apply the write protections and return the parsed body, or send
+        the error and return None."""
+        if not self._same_origin():
+            self._error(HTTPStatus.FORBIDDEN, "cross-origin request blocked")
+            return None
+        if not self.headers.get("Content-Type", "").startswith("application/json"):
+            self._error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "send JSON")
+            return None
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = -1
+        if not 0 < length <= MAX_BODY_BYTES:
+            self._error(HTTPStatus.BAD_REQUEST, "body missing or too large")
+            return None
+        try:
+            return json.loads(self.rfile.read(length))
+        except (ValueError, UnicodeDecodeError):
+            self._error(HTTPStatus.BAD_REQUEST, "body must be JSON")
+            return None
+
     # ------------------------------------------------------------- routes
     def do_GET(self):  # noqa: N802 - http.server naming
         url = urlsplit(self.path)
@@ -118,6 +143,8 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self._error(HTTPStatus.BAD_REQUEST, "limit must be a number")
             return self._send_json(HTTPStatus.OK, self.server.pod_store.get_history(limit))
+        if url.path == "/api/vr/state":
+            return self._send_json(HTTPStatus.OK, self.server.pod_vr.latest())
         if url.path == "/api/events":
             return self._stream_events()
         if url.path.startswith("/api/"):
@@ -127,20 +154,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_PATCH(self):  # noqa: N802
         if urlsplit(self.path).path != "/api/settings":
             return self._error(HTTPStatus.NOT_FOUND, "no such endpoint")
-        if not self._same_origin():
-            return self._error(HTTPStatus.FORBIDDEN, "cross-origin request blocked")
-        if not self.headers.get("Content-Type", "").startswith("application/json"):
-            return self._error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "send JSON")
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            length = -1
-        if not 0 < length <= MAX_BODY_BYTES:
-            return self._error(HTTPStatus.BAD_REQUEST, "body missing or too large")
-        try:
-            patch = json.loads(self.rfile.read(length))
-        except (ValueError, UnicodeDecodeError):
-            return self._error(HTTPStatus.BAD_REQUEST, "body must be JSON")
+        patch = self._read_json_body()
+        if patch is None:
+            return None
 
         try:
             settings, rows = self.server.pod_store.update_settings(patch, changed_by=self.client_address[0])
@@ -153,10 +169,24 @@ class Handler(BaseHTTPRequestHandler):
             self.server.pod_on_settings_changed()
         return self._send_json(HTTPStatus.OK, settings)
 
+    def do_PUT(self):  # noqa: N802
+        if urlsplit(self.path).path != "/api/vr/state":
+            return self._error(HTTPStatus.METHOD_NOT_ALLOWED, "use PATCH /api/settings")
+        msg = self._read_json_body()
+        if msg is None:
+            return None
+        try:
+            state, changed = self.server.pod_vr.update(msg)
+        except ValidationError as err:
+            return self._error(HTTPStatus.BAD_REQUEST, str(err))
+        if changed:
+            self.server.pod_hub.publish("vr", state)
+        return self._send_json(HTTPStatus.OK, state)
+
     def do_POST(self):  # noqa: N802
         self._error(HTTPStatus.METHOD_NOT_ALLOWED, "use PATCH /api/settings")
 
-    do_PUT = do_DELETE = do_POST  # noqa: N815
+    do_DELETE = do_POST  # noqa: N815
 
     # --------------------------------------------------------------- SSE
     def _stream_events(self):
@@ -212,11 +242,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def start_server(store, hub, host, port, static_dir, on_settings_changed=lambda: None):
+def start_server(store, hub, host, port, static_dir, on_settings_changed=lambda: None, vr=None):
     server = ThreadingHTTPServer((host, port), Handler)
     server.daemon_threads = True
     server.pod_store = store
     server.pod_hub = hub
+    server.pod_vr = vr if vr is not None else VrState()
     server.pod_static_root = Path(static_dir).resolve()
     server.pod_on_settings_changed = on_settings_changed
     thread = threading.Thread(target=server.serve_forever, name="web", daemon=True)
