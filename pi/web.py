@@ -208,8 +208,8 @@ class Handler(BaseHTTPRequestHandler):
                     break
                 self.wfile.write(message)
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError):
-            pass  # HUD closed or lost Wi-Fi
+        except ConnectionError:
+            pass  # HUD closed or lost Wi-Fi (incl. Windows' ConnectionAbortedError)
         finally:
             self.server.pod_hub.unsubscribe(q)
             self.close_connection = True
