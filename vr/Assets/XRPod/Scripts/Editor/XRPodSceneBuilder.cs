@@ -2,20 +2,26 @@
 // Scenes. It makes, in Assets/XRPod/Scenes:
 //
 //   Bootstrap               the VR session and a desktop test player (camera
-//                           at head height with the zone probe); never unloaded
+//                           at head height with the zone probe); never
+//                           unloaded. If it already exists it's kept and only
+//                           updated (start in the waiting room, sponsor
+//                           available, missing scene names filled in), so
+//                           things added by hand, like the Http Pod Link, stay.
+//   WaitingRoom             shown when no world is picked ("none")
 //   Beach, Forest, Desert   coloured ground, a sky, simple shapes and the
 //                           zones from vr/docs/ZONES.md. A coloured pad shows
 //                           each zone on the ground by its hint (red = hot,
 //                           blue = cool, white = windy); inner rings are darker.
 //                           Each world's base zone covers all of it and has
 //                           no pad.
+//   SponsorComingSoon       shown for "sponsor" until the sponsor's scene is in
 //
-// and sets the Build Profile's scene list to those four scenes. Keep the
-// zone ids here and in ZONES.md the same: the Pi's recipes use them.
+// and sets the Build Profile's scene list to those scenes. Keep the zone ids
+// here and in ZONES.md the same: the Pi's recipes use them.
 //
 // The worlds are stand-ins for testing switching and zones. Replace the
 // shapes with real art later and keep (or move) the zone objects. Running it
-// again replaces the four scenes, after asking.
+// again replaces every scene except Bootstrap, after asking.
 
 using System.Collections.Generic;
 using System.IO;
@@ -24,6 +30,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 using XRPod.VR.Core;
 
 namespace XRPod.VR
@@ -32,7 +39,8 @@ namespace XRPod.VR
     {
         const string SceneFolder = "Assets/XRPod/Scenes";
         const string MaterialFolder = "Assets/XRPod/Materials";
-        static readonly string[] SceneNames = { "Bootstrap", "Beach", "Forest", "Desert" };
+        // Bootstrap first: it's the scene the app starts with.
+        static readonly string[] SceneNames = { "Bootstrap", "WaitingRoom", "Beach", "Forest", "Desert", "SponsorComingSoon" };
 
         // Positions are in metres on the ground; the player starts at (0, 0)
         // facing +z, inside only the world's base zone. Rings are zones
@@ -72,10 +80,10 @@ namespace XRPod.VR
 
             var existing = new List<string>();
             foreach (var name in SceneNames)
-                if (File.Exists(ScenePath(name))) existing.Add(name);
+                if (name != "Bootstrap" && File.Exists(ScenePath(name))) existing.Add(name);
             if (existing.Count > 0 && !EditorUtility.DisplayDialog("XRPod",
                     "These scenes already exist and will be replaced, losing any changes made to them:\n\n" +
-                    string.Join(", ", existing), "Replace", "Cancel"))
+                    string.Join(", ", existing) + "\n\nBootstrap is kept and only updated.", "Replace", "Cancel"))
                 return;
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
 
@@ -83,10 +91,13 @@ namespace XRPod.VR
             Directory.CreateDirectory(MaterialFolder);
             AssetDatabase.Refresh();
 
-            BuildBootstrap();
+            if (!File.Exists(ScenePath("Bootstrap"))) BuildBootstrap();
+            UpdateBootstrap();
+            BuildWaitingRoom();
             BuildBeach();
             BuildForest();
             BuildDesert();
+            BuildSponsorComingSoon();
             AssetDatabase.SaveAssets();
 
             var buildScenes = new List<EditorBuildSettingsScene>();
@@ -97,8 +108,9 @@ namespace XRPod.VR
             EditorSceneManager.OpenScene(ScenePath("Bootstrap"));
             Debug.Log("[XRPod] Test scenes created. Open Bootstrap and press Play.");
             EditorUtility.DisplayDialog("XRPod",
-                "Test scenes are ready and Bootstrap is open. Press Play, then:\n\n" +
+                "Test scenes are ready and Bootstrap is open. Press Play: you start in the waiting room. Then:\n\n" +
                 "1 / 2 / 3   switch to Beach / Forest / Desert\n" +
+                "4   sponsor (coming soon)      0   back to the waiting room\n" +
                 "W A S D   walk (Shift: faster)\n" +
                 "Hold right mouse   look around\n\n" +
                 "Walk onto a coloured pad to enter a zone: red = hot, blue = cool, white = windy.",
@@ -142,6 +154,98 @@ namespace XRPod.VR
             settings.ApplyModifiedPropertiesWithoutUndo();
 
             Save(scene, "Bootstrap");
+        }
+
+        // Brings Bootstrap up to date without replacing it: start in the
+        // waiting room, sponsor available (its "coming soon" scene), and a
+        // scene name for every environment that has none yet. Names already
+        // set, e.g. the sponsor's real scene, are kept.
+        static void UpdateBootstrap()
+        {
+            var scene = EditorSceneManager.OpenScene(ScenePath("Bootstrap"), OpenSceneMode.Single);
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                var system = root.GetComponentInChildren<VrSystemRoot>();
+                if (system != null)
+                {
+                    var settings = new SerializedObject(system);
+                    settings.FindProperty("startEnvironment").intValue = (int)EnvironmentId.None;
+                    settings.FindProperty("sponsorAvailable").boolValue = true;
+                    settings.ApplyModifiedPropertiesWithoutUndo();
+                }
+
+                var loader = root.GetComponentInChildren<EnvironmentSceneLoader>();
+                if (loader != null)
+                {
+                    var settings = new SerializedObject(loader);
+                    var list = settings.FindProperty("scenes");
+                    foreach (var wanted in EnvironmentSceneLoader.DefaultScenes())
+                    {
+                        SerializedProperty entry = null;
+                        for (var i = 0; i < list.arraySize; i++)
+                        {
+                            var item = list.GetArrayElementAtIndex(i);
+                            if (item.FindPropertyRelative("environment").intValue == (int)wanted.environment) entry = item;
+                        }
+                        if (entry == null)
+                        {
+                            list.arraySize++;
+                            entry = list.GetArrayElementAtIndex(list.arraySize - 1);
+                            entry.FindPropertyRelative("environment").intValue = (int)wanted.environment;
+                            entry.FindPropertyRelative("sceneName").stringValue = "";
+                        }
+                        var sceneName = entry.FindPropertyRelative("sceneName");
+                        if (string.IsNullOrEmpty(sceneName.stringValue)) sceneName.stringValue = wanted.sceneName;
+                    }
+                    settings.ApplyModifiedPropertiesWithoutUndo();
+                }
+            }
+            EditorSceneManager.SaveScene(scene);
+        }
+
+        static void BuildWaitingRoom()
+        {
+            var scene = NewEnvironment("Waiting room",
+                ground: new Color(0.93f, 0.9f, 1f),
+                sky: new Color(0.75f, 0.68f, 0.95f),
+                horizon: new Color(1f, 0.84f, 0.9f),
+                sun: new Color(1f, 0.95f, 0.97f), sunIntensity: 0.9f, sunAngles: new Vector3(55f, 20f, 0f));
+            Dreamy();
+
+            var decoration = new GameObject("Decoration").transform;
+            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
+                decoration, "Waiting platform", new Color(0.82f, 0.76f, 0.98f));
+            FloatingShapes(decoration,
+                new Color(1f, 0.72f, 0.82f), new Color(0.72f, 0.85f, 1f),
+                new Color(0.8f, 1f, 0.85f), new Color(1f, 0.93f, 0.7f));
+            Sign(decoration, "No world chosen yet",
+                "Take a deep breath and relax.\nYour world will appear as soon as the operator picks one.",
+                new Color(0.42f, 0.3f, 0.7f), new Color(0.35f, 0.32f, 0.5f));
+            Save(scene, "WaitingRoom");
+        }
+
+        // A placeholder for the sponsor's world: none of their content, just
+        // a clear sign that "sponsor" was picked. Replaced by their scene in
+        // EnvironmentSceneLoader once it's integrated.
+        static void BuildSponsorComingSoon()
+        {
+            var scene = NewEnvironment("Sponsor coming soon",
+                ground: new Color(0.88f, 0.96f, 0.95f),
+                sky: new Color(0.45f, 0.75f, 0.82f),
+                horizon: new Color(1f, 0.9f, 0.72f),
+                sun: new Color(1f, 0.95f, 0.85f), sunIntensity: 1f, sunAngles: new Vector3(50f, -25f, 0f));
+            Dreamy();
+
+            var decoration = new GameObject("Decoration").transform;
+            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
+                decoration, "Sponsor platform", new Color(0.62f, 0.86f, 0.86f));
+            FloatingShapes(decoration,
+                new Color(0.35f, 0.75f, 0.78f), new Color(1f, 0.8f, 0.35f),
+                new Color(0.55f, 0.88f, 0.8f), new Color(1f, 0.9f, 0.6f));
+            Sign(decoration, "Coming soon",
+                "The sponsor's world will appear here.\nThanks for your patience!",
+                new Color(0.12f, 0.45f, 0.5f), new Color(0.25f, 0.35f, 0.4f));
+            Save(scene, "SponsorComingSoon");
         }
 
         static void BuildBeach()
@@ -312,6 +416,74 @@ namespace XRPod.VR
                 var color = Color.Lerp(ZoneColor(zone.Type), Color.black, zone.Priority / 100f);
                 Paint(pad, $"Zone {ZoneTypes.ToWireName(zone.Type)} {zone.Priority}", color, 0.1f);
             }
+        }
+
+        // Close, soft fog for the rooms: the floor fades into the sky.
+        static void Dreamy()
+        {
+            RenderSettings.fogStartDistance = 8f;
+            RenderSettings.fogEndDistance = 45f;
+        }
+
+        // Pastel shapes floating in a ring around the start spot, bobbing
+        // and turning slowly (FloatAndSpin).
+        static void FloatingShapes(Transform parent, params Color[] colors)
+        {
+            var kinds = new[] { PrimitiveType.Sphere, PrimitiveType.Cube, PrimitiveType.Capsule, PrimitiveType.Sphere };
+            for (var i = 0; i < 10; i++)
+            {
+                var angle = i * 36f + 18f;
+                var distance = i % 2 == 0 ? 6f : 8.5f;
+                var position = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * distance + Vector3.up * (1.6f + (i % 3) * 0.8f);
+                var size = 0.4f + (i % 3) * 0.2f;
+                var color = colors[i % colors.Length];
+                var shape = Shape(kinds[i % kinds.Length], "Floating shape", position, Vector3.one * size,
+                    parent, $"Pastel {i % colors.Length} {ColorUtility.ToHtmlStringRGB(color)}", color, 0.5f);
+                Object.DestroyImmediate(shape.GetComponent<Collider>());
+                shape.transform.rotation = Quaternion.Euler(20f * i, 30f * i, 10f * i);
+                shape.AddComponent<FloatAndSpin>();
+            }
+        }
+
+        // A sign 4 m ahead of the start spot at eye height: a soft panel with
+        // a title and a line of text. World-space UI, so it shows in the
+        // headset too.
+        static void Sign(Transform parent, string title, string body, Color titleColor, Color bodyColor)
+        {
+            var sign = new GameObject("Sign", typeof(RectTransform));
+            sign.transform.SetParent(parent, false);
+            sign.AddComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var rect = (RectTransform)sign.transform;
+            rect.position = new Vector3(0f, 1.9f, 4f);
+            rect.sizeDelta = new Vector2(1300f, 520f);
+            rect.localScale = Vector3.one * 0.004f; // 1300 units = 5.2 m wide
+
+            var panel = new GameObject("Panel", typeof(RectTransform)).AddComponent<Image>();
+            panel.transform.SetParent(sign.transform, false);
+            panel.color = new Color(1f, 1f, 1f, 0.6f);
+            panel.rectTransform.anchorMin = Vector2.zero;
+            panel.rectTransform.anchorMax = Vector2.one;
+            panel.rectTransform.offsetMin = Vector2.zero;
+            panel.rectTransform.offsetMax = Vector2.zero;
+
+            Label(sign.transform, title, 120, FontStyle.Bold, titleColor, 110f);
+            Label(sign.transform, body, 54, FontStyle.Normal, bodyColor, -100f);
+        }
+
+        static void Label(Transform parent, string text, int size, FontStyle style, Color color, float y)
+        {
+            var label = new GameObject("Text", typeof(RectTransform)).AddComponent<Text>();
+            label.transform.SetParent(parent, false);
+            label.rectTransform.sizeDelta = new Vector2(1250f, 240f);
+            label.rectTransform.anchoredPosition = new Vector2(0f, y);
+            label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            label.fontSize = size;
+            label.fontStyle = style;
+            label.color = color;
+            label.alignment = TextAnchor.MiddleCenter;
+            label.horizontalOverflow = HorizontalWrapMode.Wrap;
+            label.verticalOverflow = VerticalWrapMode.Overflow;
+            label.text = text;
         }
 
         static Color ZoneColor(ZoneType type) => type switch

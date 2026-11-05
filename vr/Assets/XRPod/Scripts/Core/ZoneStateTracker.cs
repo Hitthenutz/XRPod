@@ -31,7 +31,7 @@ namespace XRPod.VR.Core
 
         // false: every zone is ignored and the player stays neutral, e.g. in
         // the sponsor's environment before we've added zones to it.
-        public bool ZoneTrackingEnabled { get; private set; } = true;
+        public bool ZoneTrackingEnabled { get; private set; } // nothing to track until a world is chosen
 
         // null means neutral.
         public ZoneDefinition ActiveZone { get; private set; }

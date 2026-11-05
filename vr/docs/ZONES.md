@@ -71,7 +71,14 @@ The sea is ahead of the start point (+z).
 
 ### Sponsor
 
-No zones yet (`zone_tracking: false`). See `SPONSOR_INTEGRATION.md`.
+No zones yet (`zone_tracking: false`); it shows a "coming soon" room
+until the sponsor's world is in. See `SPONSOR_INTEGRATION.md`.
+
+### Waiting room
+
+When nothing is picked in the HUD (`selected_environment: "none"`) the
+headset shows its waiting room and reports `environment: "none"` with no
+zone. Suggested: the pod stays at a calm default.
 
 ## Changing zones
 

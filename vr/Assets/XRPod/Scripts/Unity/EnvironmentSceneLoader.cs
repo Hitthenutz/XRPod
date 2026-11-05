@@ -25,14 +25,18 @@ namespace XRPod.VR
             public string sceneName;
         }
 
-        [SerializeField] EnvironmentScene[] scenes =
+        [SerializeField] EnvironmentScene[] scenes = DefaultScenes();
+
+        // None is the waiting room. Sponsor shows a "coming soon" scene until
+        // the sponsor's files are integrated; then set its scene name to
+        // theirs (or our wrapper scene's).
+        public static EnvironmentScene[] DefaultScenes() => new[]
         {
+            new EnvironmentScene { environment = EnvironmentId.None, sceneName = "WaitingRoom" },
             new EnvironmentScene { environment = EnvironmentId.Beach, sceneName = "Beach" },
             new EnvironmentScene { environment = EnvironmentId.Forest, sceneName = "Forest" },
             new EnvironmentScene { environment = EnvironmentId.Desert, sceneName = "Desert" },
-            // Left empty until the sponsor's files are inspected; set it to
-            // their (or our wrapper) scene's name.
-            new EnvironmentScene { environment = EnvironmentId.Sponsor, sceneName = "" },
+            new EnvironmentScene { environment = EnvironmentId.Sponsor, sceneName = "SponsorComingSoon" },
         };
 
         [Tooltip("Seconds to fade to black before a switch, and back after.")]
@@ -62,6 +66,15 @@ namespace XRPod.VR
         {
             if (_environments != null) _environments.EnvironmentChanged -= OnEnvironmentChanged;
             _environments = null;
+        }
+
+        // At launch the app is in the waiting room, which isn't a change, so
+        // load its scene here unless a world is already loading.
+        void Start()
+        {
+            if (_environments == null || _loading || _loadedScene != null) return;
+            _wanted = _environments.Current;
+            StartCoroutine(LoadWanted());
         }
 
         void OnEnvironmentChanged(EnvironmentChangedEvent e)

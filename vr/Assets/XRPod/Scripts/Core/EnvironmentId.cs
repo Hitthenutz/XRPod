@@ -4,15 +4,15 @@
 // between Unity and the Pi, so they must match the Pi's list of allowed
 // values.
 //
-// Sponsor is the experience our sponsor provides. It starts out
-// unavailable, with zone tracking off, until their files are integrated
-// (see EnvironmentController and vr/docs/SPONSOR_INTEGRATION.md).
+// None ("none") means no world is picked: the headset shows the waiting
+// room. Sponsor is the experience our sponsor provides, with zone tracking
+// off (see EnvironmentController and vr/docs/SPONSOR_INTEGRATION.md).
 
 namespace XRPod.VR.Core
 {
     public enum EnvironmentId
     {
-        None = 0, // nothing selected yet
+        None = 0, // no world picked: the waiting room
         Beach = 1,
         Forest = 2,
         Desert = 3,
@@ -36,12 +36,13 @@ namespace XRPod.VR.Core
             }
         }
 
-        // Accepts "forest", "Forest" or " forest ". Returns false for anything
-        // unknown, including "none".
+        // Accepts "forest", "Forest" or " forest ", and "none" for the
+        // waiting room. Returns false for anything unknown.
         public static bool TryParse(string name, out EnvironmentId id)
         {
             id = EnvironmentId.None;
             if (name == null) return false;
+            if (name.Trim().ToLowerInvariant() == "none") return true;
             foreach (var candidate in All)
             {
                 if (ToWireName(candidate) == name.Trim().ToLowerInvariant())

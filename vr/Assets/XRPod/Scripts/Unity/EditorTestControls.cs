@@ -1,5 +1,6 @@
 // Testing without the headset. Put it on any object in the Bootstrap scene.
 //
+//   0           back to the waiting room (no world)
 //   1 / 2 / 3   switch to Beach / Forest / Desert
 //   4           switch to the sponsor environment (if marked available)
 //   P           pretend the pod asked for the next environment (only
@@ -41,6 +42,7 @@ namespace XRPod.VR
             var session = Session();
             if (keyboard == null || session == null) return;
 
+            if (keyboard.digit0Key.wasPressedThisFrame) session.Environments.Request(EnvironmentId.None, "keyboard");
             if (keyboard.digit1Key.wasPressedThisFrame) session.Environments.Request(EnvironmentId.Beach, "keyboard");
             if (keyboard.digit2Key.wasPressedThisFrame) session.Environments.Request(EnvironmentId.Forest, "keyboard");
             if (keyboard.digit3Key.wasPressedThisFrame) session.Environments.Request(EnvironmentId.Desert, "keyboard");
@@ -66,7 +68,7 @@ namespace XRPod.VR
             var zone = session.Zones.ActiveZone;
             var last = session.LastPublished;
             GUI.Label(new Rect(10, 10, 800, 80),
-                $"Environment: {session.Environments.Current}\n" +
+                $"Environment: {(session.Environments.Current == EnvironmentId.None ? "waiting room" : session.Environments.Current.ToString())}\n" +
                 $"Zone: {(!session.Zones.ZoneTrackingEnabled ? "tracking off" : zone == null ? "neutral" : zone.ToString())}" +
                 $"   (inside {session.Zones.OccupiedCount})\n" +
                 $"Last sent: {(last == null ? "-" : last.ToJson())}");

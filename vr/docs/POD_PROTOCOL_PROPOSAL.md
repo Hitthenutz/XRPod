@@ -50,10 +50,11 @@ It then gets validation, history and live updates for free:
   `DEFAULT_SETTINGS["selected_environment"] = "none"`
 - `hud/src/lib/podSettings.js`: the same default, plus a picker in the HUD
 
-Unity polls `GET /api/settings` (already exists) about once a second and
-switches when `selected_environment` **changes**. It ignores `"none"` and
-unknown values, and ignores `"sponsor"` until the sponsor content is in the
-app (it logs a warning).
+Unity polls `GET /api/settings` about once a second and follows
+`selected_environment` (every poll, so it stays in step with the HUD).
+`"none"` shows the headset's **waiting room**; `"sponsor"` shows a
+"coming soon" room until the sponsor's content is in the app. Unknown
+values are ignored and logged once.
 
 The manual/automatic switch (e.g. a `control_mode` setting) belongs to the
 Pi. Unity doesn't need it.
@@ -73,7 +74,7 @@ Content-Type: application/json
 |---|---|
 | `session_id` | Random string, new each time the app starts |
 | `seq` | Counts up from 1 within a session |
-| `environment` | `beach`, `forest`, `desert`, `sponsor` |
+| `environment` | `beach`, `forest`, `desert`, `sponsor`, or `none` (the waiting room: `zone_id` null, `zone_tracking` false) |
 | `zone_id` | Zone's id, e.g. `beach-waterline`, or `null` when no zone is known. **This is what the Pi uses:** it looks up the zone's recipe (see `ZONES.md`) |
 | `zone_type` | `neutral`, `hot`, `cool`, `windy`: only a rough hint |
 | `zone_tracking` | `false` when zones aren't detected in this environment (the sponsor's, for now). `zone_type` is then always `neutral`, meaning "unknown" |
@@ -206,7 +207,7 @@ logs it in history and pushes it to the HUD. Nothing else is needed.
 |---|---|
 | `session_id` | text, 1 to 64 characters (the headset sends 12 letters/digits) |
 | `seq` | whole number, 1 or more (not `true`/`false`) |
-| `environment` | `beach`, `forest`, `desert`, `sponsor` |
+| `environment` | `none`, `beach`, `forest`, `desert`, `sponsor` |
 | `zone_id` | `null`, or text 1 to 64 characters |
 | `zone_type` | `neutral`, `hot`, `cool`, `windy` |
 | `zone_tracking` | `true` or `false` |

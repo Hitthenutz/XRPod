@@ -11,8 +11,8 @@ namespace XRPod.VR
     [DefaultExecutionOrder(-100)] // set up before any ZoneVolume or loader
     public sealed class VrSystemRoot : MonoBehaviour
     {
-        [Tooltip("Environment to show when the app starts, until the pod asks for another one.")]
-        [SerializeField] EnvironmentId startEnvironment = EnvironmentId.Forest;
+        [Tooltip("Where the app starts, until the HUD picks a world. None = the waiting room.")]
+        [SerializeField] EnvironmentId startEnvironment = EnvironmentId.None;
 
         [Tooltip("Optional: a component that implements IPodLink, e.g. HttpPodLink. Empty = run offline.")]
         [SerializeField] MonoBehaviour podLink;
@@ -21,8 +21,8 @@ namespace XRPod.VR
         [SerializeField] bool logEvents = true;
 
         [Header("Sponsor environment (see vr/docs/SPONSOR_INTEGRATION.md)")]
-        [Tooltip("Tick once the sponsor's scene is in the project and set in EnvironmentSceneLoader.")]
-        [SerializeField] bool sponsorAvailable;
+        [Tooltip("Can the sponsor's world be picked? It shows the 'coming soon' scene until the sponsor's scene is set in EnvironmentSceneLoader.")]
+        [SerializeField] bool sponsorAvailable = true;
 
         [Tooltip("Tick once our ZoneVolumes have been added to the sponsor's scene.")]
         [SerializeField] bool sponsorZoneTracking;
@@ -63,8 +63,12 @@ namespace XRPod.VR
 
         void Start()
         {
-            if (Session.Environments.Request(startEnvironment, "startup") == EnvironmentRequestResult.Unavailable)
-                Debug.LogWarning($"Start Environment {startEnvironment} isn't available; waiting for a selection.", this);
+            var result = Session.Environments.Request(startEnvironment, "startup");
+            if (result == EnvironmentRequestResult.Unavailable)
+                Debug.LogWarning($"Start Environment {startEnvironment} isn't available; showing the waiting room.", this);
+            // Starting in the waiting room isn't a change, so say so ourselves:
+            // the Pi then knows the headset is there.
+            if (Session.Environments.Current == EnvironmentId.None) Session.PublishCurrent();
         }
 
         void OnDestroy()

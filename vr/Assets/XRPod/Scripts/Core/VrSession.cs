@@ -48,12 +48,13 @@ namespace XRPod.VR.Core
             _link.EnvironmentRequested -= OnEnvironmentRequested;
         }
 
+        // Reports the current state without waiting for a change, e.g. at
+        // startup in the waiting room, so the Pi knows the headset is there.
+        public void PublishCurrent() => Publish("environment_changed");
+
         void OnEnvironmentRequested(string name)
         {
-            // "none": nothing picked in the HUD yet, so keep showing the
-            // current environment. Not a problem worth a warning.
-            if (string.Equals(name?.Trim(), "none", StringComparison.OrdinalIgnoreCase)) return;
-
+            // "none" (nothing picked in the HUD) is valid: the waiting room.
             var result = Environments.Request(name, "pod");
             if (result == EnvironmentRequestResult.Invalid)
                 Warn($"Pod asked for unknown environment '{name}'; ignored.");

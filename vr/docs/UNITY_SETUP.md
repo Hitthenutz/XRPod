@@ -158,9 +158,11 @@ status line top-left: `Environment: Forest / Zone: neutral`.
 
 - Move with the **XR Device Simulator** (its on-screen help lists the
   keys; usually WASD plus right mouse to look).
-- **1 / 2 / 3** switch Beach / Forest / Desert. **4** selects the
-  sponsor's experience (ignored until it's integrated, see
-  `SPONSOR_INTEGRATION.md`). **P** pretends the pod asked for one.
+- The app starts in the **waiting room** ("No world chosen yet"). **1 / 2 /
+  3** switch Beach / Forest / Desert, **4** the sponsor's (a "coming soon"
+  room until it's integrated, see `SPONSOR_INTEGRATION.md`), **0** back to
+  the waiting room. **P** pretends the pod asked for one. While connected
+  to the Pi, the HUD's pick wins.
 - The Console logs every change, e.g.
   `[XRPod] [forest] zone forest-open (cool) -> forest-clearing (hot) (Entered)`.
 

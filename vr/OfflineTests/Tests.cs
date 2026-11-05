@@ -202,14 +202,50 @@ namespace XRPod.VR.OfflineTests
                 Equal(0, h.EnvironmentEvents.Count, "environment events");
             }),
 
-            new TestCase("environment names: case and spaces ok, unknown and none rejected", () =>
+            new TestCase("environment names: case and spaces ok, unknown rejected", () =>
             {
                 var h = new Harness();
                 Equal(EnvironmentRequestResult.Changed, h.Environments.Request(" Beach ", "test"), "' Beach '");
                 Equal(EnvironmentRequestResult.Invalid, h.Environments.Request("moon", "test"), "moon");
-                Equal(EnvironmentRequestResult.Invalid, h.Environments.Request("none", "test"), "none");
                 Equal(EnvironmentRequestResult.Invalid, h.Environments.Request((string)null, "test"), "null");
                 Equal(EnvironmentId.Beach, h.Environments.Current, "environment");
+                Equal(EnvironmentRequestResult.Changed, h.Environments.Request(" None ", "test"), "' None '");
+                Equal(EnvironmentId.None, h.Environments.Current, "waiting room");
+            }),
+
+            // --------------------------------------------- waiting room
+            new TestCase("waiting room: 'none' clears zones and reports no world", () =>
+            {
+                var h = new Harness();
+                h.Zones.Enter(ForestWind);
+                h.ClearRecorded();
+
+                h.Link.SimulateEnvironmentRequest("none");
+                Equal(EnvironmentId.None, h.Environments.Current, "environment");
+                Equal(null, h.Zones.ActiveZone, "zone cleared");
+                Equal(ZoneInputResult.WrongEnvironment, h.Zones.Enter(ForestWind), "old zones ignored");
+                Equal(1, h.Link.Published.Count, "messages");
+                var m = h.Link.Last;
+                Equal("none", m.Environment, "environment reported");
+                Equal(null, m.ZoneId, "zone id");
+                Equal(false, m.ZoneTracking, "zone tracking");
+                Equal(0, h.Diagnostics.Count, "diagnostics");
+
+                h.Link.SimulateEnvironmentRequest("beach");
+                Equal(EnvironmentId.Beach, h.Environments.Current, "back to a world");
+                Equal(true, h.Link.Last.ZoneTracking, "tracking back on");
+            }),
+
+            new TestCase("waiting room: the app can report it at startup", () =>
+            {
+                var h = new Harness(EnvironmentId.None);
+                Equal(EnvironmentRequestResult.AlreadyActive, h.Environments.Request(EnvironmentId.None, "startup"), "already there");
+                h.Session.PublishCurrent();
+                h.Session.PublishCurrent();
+                Equal(1, h.Link.Published.Count, "one message");
+                Equal("none", h.Link.Last.Environment, "environment");
+                Equal(false, h.Link.Last.ZoneTracking, "zone tracking");
+                Equal("environment_changed", h.Link.Last.Reason, "reason");
             }),
 
             // ------------------------------------- reporting to the pod
@@ -287,15 +323,6 @@ namespace XRPod.VR.OfflineTests
                 h.Environments.Request(EnvironmentId.Desert, "keyboard");
                 h.Link.SimulateEnvironmentRequest("beach");
                 Equal(EnvironmentId.Beach, h.Environments.Current, "back in step");
-                Equal(0, h.Diagnostics.Count, "diagnostics");
-            }),
-
-            new TestCase("pod choice 'none' keeps the current environment quietly", () =>
-            {
-                var h = new Harness();
-                h.Link.SimulateEnvironmentRequest("none");
-                h.Link.SimulateEnvironmentRequest("None ");
-                Equal(EnvironmentId.Forest, h.Environments.Current, "environment");
                 Equal(0, h.Diagnostics.Count, "diagnostics");
             }),
 

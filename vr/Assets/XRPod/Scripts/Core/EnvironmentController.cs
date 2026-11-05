@@ -6,9 +6,13 @@
 //   2. raises EnvironmentChanged, which the scene loader listens to.
 // It doesn't load scenes itself, so it can be tested without Unity.
 //
+// None is the waiting room (no world picked). It's always available and
+// has no zones. The app starts there.
+//
 // Each environment has two switches:
-//   - available: can it be selected? Off for Sponsor until its files are
-//     integrated, so selecting it doesn't leave the user in a missing scene.
+//   - available: can it be selected? Off for Sponsor by default; Unity
+//     turns it on (VrSystemRoot) and shows a "coming soon" scene until the
+//     sponsor's files are integrated.
 //   - zone tracking: are zones detected there? Off for Sponsor until we
 //     know whether we can add our own zones to its scene.
 // Beach, Forest and Desert are on for both.
@@ -37,7 +41,8 @@ namespace XRPod.VR.Core
         // never disagree.
         public EnvironmentId Current => _zones.Environment;
 
-        public bool IsAvailable(EnvironmentId environment) => _available.Contains(environment);
+        public bool IsAvailable(EnvironmentId environment) =>
+            environment == EnvironmentId.None || _available.Contains(environment);
 
         public bool HasZoneTracking(EnvironmentId environment) => _zoneTracking.Contains(environment);
 
@@ -59,7 +64,6 @@ namespace XRPod.VR.Core
 
         public EnvironmentRequestResult Request(EnvironmentId environment, string source)
         {
-            if (environment == EnvironmentId.None) return EnvironmentRequestResult.Invalid;
             if (!IsAvailable(environment)) return EnvironmentRequestResult.Unavailable;
             if (environment == Current) return EnvironmentRequestResult.AlreadyActive;
 

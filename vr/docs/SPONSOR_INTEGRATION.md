@@ -13,11 +13,11 @@ are in the repo, and nothing below has been tried.
 | Piece | State |
 |---|---|
 | `EnvironmentId.Sponsor`, wire name `"sponsor"` | Done, tested offline |
-| **Available** switch: selecting Sponsor is ignored (and logged) until it's ticked | Done, tested offline. VrSystemRoot → *Sponsor Available*, off by default |
+| **Available** switch: can Sponsor be picked? | Done, tested offline. VrSystemRoot → *Sponsor Available*, on (it shows the "coming soon" room) |
 | **Zone tracking** switch: zones are ignored in Sponsor until it's ticked; the Pi is told `zone_tracking: false` | Done, tested offline. VrSystemRoot → *Sponsor Zone Tracking*, off by default |
 | Switching Sponsor ↔ Beach/Forest/Desert in any order | Done, tested offline |
-| Scene to load for Sponsor | `EnvironmentSceneLoader` has a Sponsor row with an **empty** scene name, to fill in later |
-| Key **4** in the Editor | Selects Sponsor (if available) |
+| Scene to load for Sponsor | `EnvironmentSceneLoader`'s Sponsor row says `SponsorComingSoon`, our placeholder (none of the sponsor's content). Change it to their scene's name once it's integrated |
+| Key **4** in the Editor | Selects Sponsor |
 
 Beach, Forest and Desert are unaffected: they're always available, with
 zone tracking on.
