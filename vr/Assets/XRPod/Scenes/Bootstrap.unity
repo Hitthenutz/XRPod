@@ -172,7 +172,10 @@ MonoBehaviour:
   - environment: 3
     sceneName: Desert
   - environment: 4
-    sceneName: 
+    sceneName: SponsorComingSoon
+  - environment: 0
+    sceneName: WaitingRoom
+  fadeSeconds: 0.3
 --- !u!114 &755827249
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -185,10 +188,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f68d30b96ebbab74f853929d12928abc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.VrSystemRoot
-  startEnvironment: 2
+  startEnvironment: 0
   podLink: {fileID: 755827251}
   logEvents: 1
-  sponsorAvailable: 0
+  sponsorAvailable: 1
   sponsorZoneTracking: 0
 --- !u!4 &755827250
 Transform:

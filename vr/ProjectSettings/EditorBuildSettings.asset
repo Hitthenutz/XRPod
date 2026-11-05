@@ -9,6 +9,9 @@ EditorBuildSettings:
     path: Assets/XRPod/Scenes/Bootstrap.unity
     guid: 268baa8e1aae4724fa167cba9e9a193a
   - enabled: 1
+    path: Assets/XRPod/Scenes/WaitingRoom.unity
+    guid: a23a5763e87e2ee46bdaa88f744042e7
+  - enabled: 1
     path: Assets/XRPod/Scenes/Beach.unity
     guid: 6d0c9bae2d72864458c2c8c9a1ec0e22
   - enabled: 1
@@ -17,5 +20,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/XRPod/Scenes/Desert.unity
     guid: 19381e7c9c6405e4ab54207b55c06f0b
+  - enabled: 1
+    path: Assets/XRPod/Scenes/SponsorComingSoon.unity
+    guid: ff18243657acaee4c806a7000b1629e4
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
