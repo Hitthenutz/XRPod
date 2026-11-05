@@ -16,10 +16,14 @@ dist
 *.swp
 
 # Pi database (settings, readings, history)
-pi-agent/*.db
-pi-agent/*.db-*
+pi/*.db
+pi/*.db-*
 
-# Python (pi-agent)
+# Python (pi)
 __pycache__/
 *.pyc
 .venv/
+
+# ESP32 / PlatformIO
+.pio/
+esp32/*/include/secrets.h

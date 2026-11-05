@@ -1,0 +1,21 @@
+#!/bin/sh
+# XRPod guard (enabled per clone by tools/setup-git.ps1): on branches starting with "scent",
+# block commits that touch files outside Matt's folders.
+# One-off override: git commit --no-verify
+
+ALLOWED='^(esp32/scent-node/|esp32/xrpod-esp32\.code-workspace$|\.github/CODEOWNERS$)'
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+case "$branch" in
+  scent*) ;;
+  *) exit 0 ;;
+esac
+
+outside=$(git diff --cached --name-only --no-renames | grep -Ev "$ALLOWED")
+if [ -n "$outside" ]; then
+  echo "Commit blocked: on '$branch' you can only change esp32/scent-node/." >&2
+  echo "Unstage these files (Source Control > '-' next to each):" >&2
+  echo "$outside" | sed 's/^/  /' >&2
+  exit 1
+fi
+exit 0

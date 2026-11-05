@@ -9,7 +9,7 @@ API (all JSON):
   GET   /api/events            Server-Sent Events stream: "settings",
                                "reading" and "history" events, live
 
-Everything else serves the built HUD from ../dist (run `npm run build`).
+Everything else serves the built HUD from ../hud/dist (run `npm run build` in hud/).
 
 Security: this is meant for the pod's local network. Anyone who can reach
 the Pi can use the HUD; there is no login. Writes are
@@ -187,7 +187,7 @@ class Handler(BaseHTTPRequestHandler):
     # ------------------------------------------------------------ static
     def _serve_static(self, path):
         target = (self.server.pod_static_root / path.lstrip("/")).resolve()
-        # Refuse anything outside dist/ (e.g. /../pi-agent/xrpod.db).
+        # Refuse anything outside dist/ (e.g. /../pi/xrpod.db).
         if self.server.pod_static_root not in target.parents and target != self.server.pod_static_root:
             return self._error(HTTPStatus.NOT_FOUND, "not found")
         if not target.is_file():

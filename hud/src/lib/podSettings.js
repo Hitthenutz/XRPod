@@ -1,6 +1,6 @@
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
 
-// Mirrors DEFAULT_SETTINGS in pi-agent/store.py, which owns the real values.
+// Mirrors DEFAULT_SETTINGS in pi/store.py, which owns the real values.
 export const DEFAULT_SETTINGS = {
   target_temp_f: 72,
   target_humidity_pct: 45,
