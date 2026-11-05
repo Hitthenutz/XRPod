@@ -212,6 +212,25 @@ class VrStateTests(unittest.TestCase):
         self.now += STALE_SECONDS + 1
         self.assertFalse(self.vr.latest()["connected"])
 
+    def test_repeat_keeps_it_connected(self):
+        # The headset resends its latest message (same seq) every ~5 s while
+        # nothing changes. That must count as hearing from it.
+        self.vr.update(GOOD_VR)
+        for _ in range(3):
+            self.now += STALE_SECONDS - 1
+            state, changed = self.vr.update(GOOD_VR)
+            self.assertFalse(changed)
+            self.assertTrue(state["connected"])
+            self.assertEqual(state["age_s"], 0)
+
+    def test_late_message_does_not_keep_it_connected(self):
+        self.vr.update(GOOD_VR)
+        self.now += STALE_SECONDS + 1
+        late = {**GOOD_VR, "seq": 1, "zone_id": None, "zone_type": "neutral"}
+        state, _ = self.vr.update(late)
+        self.assertFalse(state["connected"])
+        self.assertEqual(state["seq"], 2)
+
 
 class WebTests(unittest.TestCase):
     @classmethod

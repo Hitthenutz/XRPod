@@ -11,7 +11,7 @@ manual mode nothing here changes the hardware. In auto mode the control
 logic can read latest() and decide what to do.
 
 Message format: Maryam's "Proposal: how the Pi and the VR app talk"
-(unity/docs/POD_PROTOCOL_PROPOSAL.md on maryam/vr-development).
+(vr/docs/POD_PROTOCOL_PROPOSAL.md).
 """
 
 import threading
@@ -88,14 +88,22 @@ class VrState:
         self._received_at = None  # clock() value, for staleness
 
     def update(self, msg):
-        """Validate and store `msg`. Returns (state, changed). A message with
-        a seq no higher than the stored one from the same session arrived
-        late: it is ignored (changed=False). A new session_id means the app
-        restarted, so it is accepted whatever its seq."""
+        """Validate and store `msg`. Returns (state, changed). Within one
+        session_id:
+          - a higher seq is new: stored (changed=True);
+          - the same seq is the headset's ~5 s repeat: the state is kept, but
+            it counts as hearing from the headset, so it stays connected
+            while the user stands still (changed=False);
+          - a lower seq arrived late: ignored (changed=False).
+        A new session_id means the app restarted, so it is accepted whatever
+        its seq."""
         clean = validate_vr_state(msg)
         with self._lock:
             old = self._state
             if old and old["session_id"] == clean["session_id"] and clean["seq"] <= old["seq"]:
+                if clean["seq"] == old["seq"]:
+                    self._state = {**old, "received_date": now_iso()}
+                    self._received_at = self._clock()
                 return self._view(), False
             self._state = {**clean, "received_date": now_iso()}
             self._received_at = self._clock()
