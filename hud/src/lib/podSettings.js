@@ -1,4 +1,7 @@
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
+// Mirror CONTROL_MODES and ENVIRONMENTS in pi/store.py.
+export const CONTROL_MODES = ["manual", "auto"];
+export const ENVIRONMENTS = ["none", "beach", "forest", "desert", "sponsor"];
 
 // Mirrors DEFAULT_SETTINGS in pi/store.py, which owns the real values.
 export const DEFAULT_SETTINGS = {
@@ -9,6 +12,8 @@ export const DEFAULT_SETTINGS = {
   heater_on: false,
   selected_scent: "none",
   scent_intensity_pct: 50,
+  control_mode: "manual",
+  selected_environment: "none",
 };
 
 export const SETTINGS_FIELDS = Object.keys(DEFAULT_SETTINGS);
@@ -21,6 +26,8 @@ export const FIELD_LABELS = {
   heater_on: "Heater",
   selected_scent: "Scent",
   scent_intensity_pct: "Scent intensity",
+  control_mode: "Mode",
+  selected_environment: "Environment",
 };
 
 // Human-readable rendering of a stringified settings value for the history list.

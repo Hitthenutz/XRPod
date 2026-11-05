@@ -15,6 +15,18 @@ import time
 from datetime import datetime, timezone
 
 SCENTS = ("none", "lavender", "pine", "citrus", "ocean", "rain")
+# Who is in charge: the researcher (manual) or the Pi's own control logic
+# (auto). VR state never drives the hardware in manual mode.
+CONTROL_MODES = ("manual", "auto")
+# Which experience the headset shows. "none" means no environment picked.
+ENVIRONMENTS = ("none", "beach", "forest", "desert", "sponsor")
+
+# Fields whose value must be one of a fixed list.
+CHOICES = {
+    "selected_scent": SCENTS,
+    "control_mode": CONTROL_MODES,
+    "selected_environment": ENVIRONMENTS,
+}
 
 # field -> (kind, min, max). Mirrors src/lib/podSettings.js.
 SETTINGS_SCHEMA = {
@@ -23,8 +35,10 @@ SETTINGS_SCHEMA = {
     "fan_speed_pct": ("int", 0, 100),
     "ac_on": ("bool", None, None),
     "heater_on": ("bool", None, None),
-    "selected_scent": ("scent", None, None),
+    "selected_scent": ("choice", None, None),
     "scent_intensity_pct": ("int", 0, 100),
+    "control_mode": ("choice", None, None),
+    "selected_environment": ("choice", None, None),
 }
 
 DEFAULT_SETTINGS = {
@@ -35,6 +49,8 @@ DEFAULT_SETTINGS = {
     "heater_on": False,
     "selected_scent": "none",
     "scent_intensity_pct": 50,
+    "control_mode": "manual",
+    "selected_environment": "none",
 }
 
 # Keep the database small on the Pi's SD card.
@@ -57,9 +73,10 @@ def _validate_value(field, value):
         if not isinstance(value, bool):
             raise ValidationError(f"{field} must be true or false")
         return value
-    if kind == "scent":
-        if value not in SCENTS:
-            raise ValidationError(f"{field} must be one of {', '.join(SCENTS)}")
+    if kind == "choice":
+        options = CHOICES[field]
+        if not isinstance(value, str) or value not in options:
+            raise ValidationError(f"{field} must be one of {', '.join(options)}")
         return value
     # number / int: reject bools (True is an int in Python), NaN and inf.
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:

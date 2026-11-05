@@ -3,7 +3,8 @@
     python3 -m unittest discover -s pi -v
 
 Covers the safety rules (heater/AC exclusion, junk values, one scent at a
-time), settings validation and history, and the web server's protections.
+time), settings validation and history, VR state reports, and the web
+server's protections.
 """
 
 import json
@@ -20,7 +21,12 @@ sys.path.insert(0, os.path.dirname(__file__))
 import hardware  # noqa: E402
 import scent  # noqa: E402
 from store import Store, ValidationError  # noqa: E402
+from vr import STALE_SECONDS, VrState  # noqa: E402
 from web import EventHub, start_server  # noqa: E402
+
+GOOD_VR = {"session_id": "test1", "seq": 2, "environment": "forest",
+           "zone_id": "clearing-wind", "zone_type": "windy", "zone_tracking": True,
+           "reason": "zone_entered"}
 
 
 class RecordingBackend:
@@ -103,6 +109,17 @@ class StoreTests(unittest.TestCase):
         s = self.store.get_settings()
         self.assertEqual(s["target_temp_f"], 72)
         self.assertFalse(s["heater_on"])
+        self.assertEqual(s["control_mode"], "manual")
+        self.assertEqual(s["selected_environment"], "none")
+
+    def test_mode_and_environment(self):
+        s, rows = self.store.update_settings({"control_mode": "auto", "selected_environment": "beach"})
+        self.assertEqual((s["control_mode"], s["selected_environment"]), ("auto", "beach"))
+        self.assertEqual({r["field_name"] for r in rows}, {"control_mode", "selected_environment"})
+        for patch in [{"control_mode": "AUTO"}, {"control_mode": True},
+                      {"selected_environment": "moon"}, {"selected_environment": None}]:
+            with self.assertRaises(ValidationError, msg=patch):
+                self.store.update_settings(patch)
 
     def test_turning_one_on_turns_the_other_off(self):
         self.store.update_settings({"heater_on": True})
@@ -143,6 +160,57 @@ class StoreTests(unittest.TestCase):
         self.store.add_reading({"actual_temp_f": 70.0})
         latest = self.store.add_reading({"actual_temp_f": 71.0})
         self.assertEqual(self.store.get_latest_reading(), latest)
+
+
+class VrStateTests(unittest.TestCase):
+    def setUp(self):
+        self.now = 1000.0
+        self.vr = VrState(clock=lambda: self.now)
+
+    def test_accepts_good_message(self):
+        self.assertIsNone(self.vr.latest())
+        state, changed = self.vr.update(GOOD_VR)
+        self.assertTrue(changed)
+        self.assertEqual(state["zone_type"], "windy")
+        self.assertTrue(state["connected"])
+
+    def test_rejects_bad_fields(self):
+        bad = [
+            {**GOOD_VR, "zone_type": "lava"},
+            {**GOOD_VR, "environment": "none"},
+            {**GOOD_VR, "reason": "teleported"},
+            {**GOOD_VR, "seq": 0},
+            {**GOOD_VR, "seq": True},
+            {**GOOD_VR, "seq": 2.5},
+            {**GOOD_VR, "session_id": ""},
+            {**GOOD_VR, "session_id": "x" * 65},
+            {**GOOD_VR, "zone_id": ""},
+            {**GOOD_VR, "zone_tracking": "yes"},
+            {**GOOD_VR, "fan_speed_pct": 100},  # headset must never drive hardware
+            {k: v for k, v in GOOD_VR.items() if k != "reason"},
+            {**GOOD_VR, "zone_id": None},  # null zone must be neutral
+            {**GOOD_VR, "zone_tracking": False},  # no tracking means no zone
+            [], "forest",
+        ]
+        for msg in bad:
+            with self.assertRaises(ValidationError, msg=msg):
+                self.vr.update(msg)
+        self.assertIsNone(self.vr.latest())
+
+    def test_late_message_is_ignored_but_new_session_wins(self):
+        self.vr.update(GOOD_VR)
+        late = {**GOOD_VR, "seq": 1, "zone_id": None, "zone_type": "neutral"}
+        state, changed = self.vr.update(late)
+        self.assertFalse(changed)
+        self.assertEqual(state["seq"], 2)
+        state, changed = self.vr.update({**late, "session_id": "restarted"})
+        self.assertTrue(changed)
+        self.assertEqual(state["session_id"], "restarted")
+
+    def test_goes_stale(self):
+        self.vr.update(GOOD_VR)
+        self.now += STALE_SECONDS + 1
+        self.assertFalse(self.vr.latest()["connected"])
 
 
 class WebTests(unittest.TestCase):
@@ -214,6 +282,33 @@ class WebTests(unittest.TestCase):
         self.assertIn("HUD", self.request("GET", "/some/route")[1])
         for path in ["/../secret.txt", "/%2e%2e/secret.txt"]:
             self.assertNotIn("do not serve", self.request("GET", path)[1], path)
+
+    def put_vr(self, msg, **headers):
+        body = msg if isinstance(msg, str) else json.dumps(msg)
+        return self.request("PUT", "/api/vr/state", body,
+                            {"Content-Type": "application/json", **headers})
+
+    def test_vr_state_endpoint(self):
+        status, body = self.put_vr({**GOOD_VR, "session_id": "web1"})
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["zone_id"], "clearing-wind")
+        self.assertEqual(self.put_vr({**GOOD_VR, "zone_type": "lava"})[0], 400)
+        self.assertEqual(self.put_vr("not json")[0], 400)
+        # A late message still gets 200 but doesn't replace the newer one.
+        late = {**GOOD_VR, "session_id": "web1", "seq": 1, "zone_id": None, "zone_type": "neutral"}
+        self.assertEqual(self.put_vr(late)[0], 200)
+        status, body = self.request("GET", "/api/vr/state")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["seq"], 2)
+
+    def test_vr_state_keeps_web_protections(self):
+        self.assertEqual(self.put_vr(GOOD_VR, Origin="http://evil.example")[0], 403)
+        status, _ = self.request("PUT", "/api/vr/state", "x=1",
+                                 {"Content-Type": "application/x-www-form-urlencoded"})
+        self.assertEqual(status, 415)
+        self.assertEqual(self.put_vr({**GOOD_VR, "pad": "x" * 10000})[0], 400)
+        self.assertEqual(self.request("PUT", "/api/settings", "{}",
+                                      {"Content-Type": "application/json"})[0], 405)
 
     def test_read_endpoints(self):
         self.assertEqual(self.request("GET", "/api/settings")[0], 200)
