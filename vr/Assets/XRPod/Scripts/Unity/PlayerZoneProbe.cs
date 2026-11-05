@@ -26,7 +26,7 @@ namespace XRPod.VR
         void Awake()
         {
             Configure();
-            if (FindObjectsByType<PlayerZoneProbe>(FindObjectsSortMode.None).Length > 1)
+            if (FindObjectsByType<PlayerZoneProbe>().Length > 1)
                 Debug.LogWarning("More than one PlayerZoneProbe: zones may see the player twice. Keep one.", this);
         }
 
