@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &652113398
+--- !u!1 &755827246
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,10 +127,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 652113402}
-  - component: {fileID: 652113401}
-  - component: {fileID: 652113400}
-  - component: {fileID: 652113399}
+  - component: {fileID: 755827250}
+  - component: {fileID: 755827249}
+  - component: {fileID: 755827248}
+  - component: {fileID: 755827247}
   m_Layer: 0
   m_Name: XRPod
   m_TagString: Untagged
@@ -138,26 +138,26 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &652113399
+--- !u!114 &755827247
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652113398}
+  m_GameObject: {fileID: 755827246}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 80cdcdabb0ad1a940b31bf5f69de1fe0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.EditorTestControls
   showOverlay: 1
---- !u!114 &652113400
+--- !u!114 &755827248
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652113398}
+  m_GameObject: {fileID: 755827246}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a8531a9c37998140a0de4e7bd273137, type: 3}
@@ -172,13 +172,13 @@ MonoBehaviour:
     sceneName: Desert
   - environment: 4
     sceneName: 
---- !u!114 &652113401
+--- !u!114 &755827249
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652113398}
+  m_GameObject: {fileID: 755827246}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f68d30b96ebbab74f853929d12928abc, type: 3}
@@ -189,13 +189,13 @@ MonoBehaviour:
   logEvents: 1
   sponsorAvailable: 0
   sponsorZoneTracking: 0
---- !u!4 &652113402
+--- !u!4 &755827250
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 652113398}
+  m_GameObject: {fileID: 755827246}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -204,7 +204,7 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1649374525
+--- !u!1 &912919130
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -212,59 +212,10 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1649374527}
-  - component: {fileID: 1649374526}
-  m_Layer: 0
-  m_Name: Player (desktop test rig)
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1649374526
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1649374525}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d1bf6d602fb39a64593cdd7113d2c618, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.DesktopTestMover
-  head: {fileID: 1731572455}
-  walkSpeed: 2
-  runSpeed: 5
-  lookSpeed: 0.15
---- !u!4 &1649374527
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1649374525}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 1731572455}
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1709770546
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1709770547}
-  - component: {fileID: 1709770550}
-  - component: {fileID: 1709770549}
-  - component: {fileID: 1709770548}
+  - component: {fileID: 912919131}
+  - component: {fileID: 912919134}
+  - component: {fileID: 912919133}
+  - component: {fileID: 912919132}
   m_Layer: 0
   m_Name: ZoneProbe
   m_TagString: Untagged
@@ -272,40 +223,40 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1709770547
+--- !u!4 &912919131
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1709770546}
+  m_GameObject: {fileID: 912919130}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1731572455}
+  m_Father: {fileID: 1922063095}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1709770548
+--- !u!114 &912919132
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1709770546}
+  m_GameObject: {fileID: 912919130}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3fa36fbe16d8c9e47a6d9194bd47d180, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.PlayerZoneProbe
---- !u!54 &1709770549
+--- !u!54 &912919133
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1709770546}
+  m_GameObject: {fileID: 912919130}
   serializedVersion: 5
   m_Mass: 1
   m_LinearDamping: 0
@@ -326,13 +277,13 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 0
   m_CollisionDetection: 0
---- !u!135 &1709770550
+--- !u!135 &912919134
 SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1709770546}
+  m_GameObject: {fileID: 912919130}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -347,7 +298,7 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.15
   m_Center: {x: 0, y: 0, z: 0}
---- !u!1 &1731572454
+--- !u!1 &1721161987
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -355,9 +306,58 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1731572455}
-  - component: {fileID: 1731572457}
-  - component: {fileID: 1731572456}
+  - component: {fileID: 1721161989}
+  - component: {fileID: 1721161988}
+  m_Layer: 0
+  m_Name: Player (desktop test rig)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1721161988
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1721161987}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d1bf6d602fb39a64593cdd7113d2c618, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.DesktopTestMover
+  head: {fileID: 1922063095}
+  walkSpeed: 2
+  runSpeed: 5
+  lookSpeed: 0.15
+--- !u!4 &1721161989
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1721161987}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1922063095}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1922063094
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1922063095}
+  - component: {fileID: 1922063097}
+  - component: {fileID: 1922063096}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -365,37 +365,37 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &1731572455
+--- !u!4 &1922063095
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1731572454}
+  m_GameObject: {fileID: 1922063094}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 1.6, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1709770547}
-  m_Father: {fileID: 1649374527}
+  - {fileID: 912919131}
+  m_Father: {fileID: 1721161989}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!81 &1731572456
+--- !u!81 &1922063096
 AudioListener:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1731572454}
+  m_GameObject: {fileID: 1922063094}
   m_Enabled: 1
---- !u!20 &1731572457
+--- !u!20 &1922063097
 Camera:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1731572454}
+  m_GameObject: {fileID: 1922063094}
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
@@ -444,5 +444,5 @@ Camera:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 652113402}
-  - {fileID: 1649374527}
+  - {fileID: 755827250}
+  - {fileID: 1721161989}

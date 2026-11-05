@@ -3,11 +3,15 @@
 //
 //   Bootstrap               the VR session and a desktop test player (camera
 //                           at head height with the zone probe); never unloaded
-//   Beach, Forest, Desert   coloured ground, a sky, simple shapes and example
-//                           zones. A coloured pad shows each zone on the ground:
-//                           red = hot, blue = cool, white = windy.
+//   Beach, Forest, Desert   coloured ground, a sky, simple shapes and the
+//                           zones from vr/docs/ZONES.md. A coloured pad shows
+//                           each zone on the ground by its hint (red = hot,
+//                           blue = cool, white = windy); inner rings are darker.
+//                           Each world's base zone covers all of it and has
+//                           no pad.
 //
-// and sets the Build Profile's scene list to those four scenes.
+// and sets the Build Profile's scene list to those four scenes. Keep the
+// zone ids here and in ZONES.md the same: the Pi's recipes use them.
 //
 // The worlds are stand-ins for testing switching and zones. Replace the
 // shapes with real art later and keep (or move) the zone objects. Running it
@@ -31,7 +35,8 @@ namespace XRPod.VR
         static readonly string[] SceneNames = { "Bootstrap", "Beach", "Forest", "Desert" };
 
         // Positions are in metres on the ground; the player starts at (0, 0)
-        // facing +z, outside every zone.
+        // facing +z, inside only the world's base zone. Rings are zones
+        // inside zones with a higher priority, e.g. shore then waterline.
         readonly struct Zone
         {
             public readonly string Id;
@@ -40,7 +45,7 @@ namespace XRPod.VR
             public readonly Vector2 Size;
             public readonly int Priority;
 
-            public Zone(string id, ZoneType type, float x, float z, float width, float depth, int priority = 0)
+            public Zone(string id, ZoneType type, float x, float z, float width, float depth, int priority)
             {
                 Id = id;
                 Type = type;
@@ -48,6 +53,12 @@ namespace XRPod.VR
                 Size = new Vector2(width, depth);
                 Priority = priority;
             }
+
+            // The whole 100 x 100 m world, lowest priority: what it feels
+            // like anywhere outside the other zones.
+            public static Zone Base(string id, ZoneType type) => new Zone(id, type, 0f, 0f, 100f, 100f, 0);
+
+            public bool IsBase => Priority == 0;
         }
 
         [MenuItem("XRPod/Create Test Scenes")]
@@ -149,10 +160,14 @@ namespace XRPod.VR
             Palm(scenery, -5f, -10f);
             Palm(scenery, 20f, -4f);
 
+            // Walking towards the sea: open sand -> shore -> waterline, each
+            // ring windier, more humid and saltier.
             AddZones(EnvironmentId.Beach,
-                new Zone("beach-hot-sand", ZoneType.Hot, -9f, 8f, 8f, 8f),
-                new Zone("beach-cool-shore", ZoneType.Cool, 0f, 21f, 20f, 6f),
-                new Zone("beach-windy-dunes", ZoneType.Windy, 10f, 6f, 8f, 8f));
+                Zone.Base("beach-open", ZoneType.Hot),
+                new Zone("beach-shore", ZoneType.Windy, 0f, 18.5f, 100f, 13f, 10),
+                new Zone("beach-waterline", ZoneType.Cool, 0f, 24.5f, 100f, 7f, 20),
+                new Zone("beach-dunes", ZoneType.Windy, 16f, 4f, 8f, 8f, 10),
+                new Zone("beach-palm-shade", ZoneType.Cool, -5f, -10f, 5f, 5f, 10));
             Save(scene, "Beach");
         }
 
@@ -175,11 +190,18 @@ namespace XRPod.VR
                 new Vector2(0f, 40f), new Vector2(-15f, 38f), new Vector2(15f, 40f),
             };
             foreach (var spot in trees) Tree(scenery, spot.x, spot.y);
+            Shape(PrimitiveType.Sphere, "Rain cloud", new Vector3(-15f, 7f, 20f), new Vector3(16f, 2.5f, 16f),
+                scenery, "Rain cloud", new Color(0.55f, 0.57f, 0.6f));
+            Shape(PrimitiveType.Sphere, "Rain cloud (heavy)", new Vector3(-15f, 6f, 20f), new Vector3(9f, 2.5f, 9f),
+                scenery, "Rain cloud heavy", new Color(0.3f, 0.32f, 0.36f));
 
+            // The rain gets heavier towards the middle of the rainy area.
             AddZones(EnvironmentId.Forest,
-                new Zone("forest-clearing-wind", ZoneType.Windy, 0f, 12f, 10f, 10f),
-                new Zone("forest-sunny-patch", ZoneType.Hot, -12f, 4f, 6f, 6f),
-                new Zone("forest-shady-stream", ZoneType.Cool, 12f, 4f, 6f, 10f));
+                Zone.Base("forest-open", ZoneType.Cool),
+                new Zone("forest-clearing", ZoneType.Hot, 0f, 12f, 10f, 10f, 10),
+                new Zone("forest-rain", ZoneType.Cool, -15f, 20f, 16f, 16f, 10),
+                new Zone("forest-rain-heavy", ZoneType.Cool, -15f, 20f, 8f, 8f, 20),
+                new Zone("forest-stream", ZoneType.Cool, 12f, 5f, 6f, 70f, 10));
             Save(scene, "Forest");
         }
 
@@ -193,8 +215,8 @@ namespace XRPod.VR
 
             var scenery = new GameObject("Scenery").transform;
             var rock = new Color(0.6f, 0.42f, 0.3f);
-            // A small cave, open towards the start point. Its cool zone sits
-            // inside the hot area with a higher priority, to test overlaps.
+            // A small cave, open towards the start point: shade at its mouth,
+            // cooler still inside.
             Shape(PrimitiveType.Cube, "Cave left wall", new Vector3(-3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
             Shape(PrimitiveType.Cube, "Cave right wall", new Vector3(3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
             Shape(PrimitiveType.Cube, "Cave back wall", new Vector3(0f, 1.5f, 25.2f), new Vector3(6.8f, 3f, 0.4f), scenery, "Rock", rock);
@@ -205,9 +227,11 @@ namespace XRPod.VR
             Shape(PrimitiveType.Sphere, "Rock", new Vector3(-22f, 0.6f, -15f), new Vector3(3.5f, 2f, 2.5f), scenery, "Rock", rock);
 
             AddZones(EnvironmentId.Desert,
-                new Zone("desert-open-heat", ZoneType.Hot, 0f, 15f, 30f, 20f),
-                new Zone("desert-cool-cave", ZoneType.Cool, 0f, 22f, 6f, 6f, priority: 10),
-                new Zone("desert-windy-ridge", ZoneType.Windy, -22f, 0f, 6f, 12f));
+                Zone.Base("desert-open", ZoneType.Hot),
+                new Zone("desert-cave-mouth", ZoneType.Cool, 0f, 18.5f, 8f, 3f, 10),
+                new Zone("desert-cave-inside", ZoneType.Cool, 0f, 22.5f, 6f, 5f, 20),
+                new Zone("desert-rock-shade", ZoneType.Cool, 18f, 26f, 6f, 4f, 10),
+                new Zone("desert-ridge", ZoneType.Windy, -22f, 0f, 6f, 12f, 10));
             Save(scene, "Desert");
         }
 
@@ -232,10 +256,10 @@ namespace XRPod.VR
 
             // Environment scenes become the active scene when loaded, so these
             // settings apply while the scene is showing.
-            var skybox = new Material(Shader.Find("Skybox/Procedural"));
+            var skybox = MaterialAsset(name + " sky", "Skybox/Procedural");
             skybox.SetColor("_SkyTint", sky);
             skybox.SetColor("_GroundColor", horizon);
-            RenderSettings.skybox = SaveMaterial(skybox, name + " sky");
+            RenderSettings.skybox = skybox;
             RenderSettings.sun = light;
             // Fixed colours: ambient light from a skybox needs a lighting bake.
             RenderSettings.ambientMode = AmbientMode.Trilight;
@@ -273,14 +297,17 @@ namespace XRPod.VR
                 volume.ApplyModifiedPropertiesWithoutUndo();
 
                 // The trigger is invisible; this pad shows where the zone is.
-                // Higher priority pads sit slightly higher so they don't flicker.
+                // Higher priority pads sit slightly higher so they don't
+                // flicker, and are darker so rings can be told apart.
+                if (zone.IsBase) continue;
                 var pad = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 pad.name = "Marker";
                 Object.DestroyImmediate(pad.GetComponent<Collider>());
                 pad.transform.SetParent(zoneObject.transform, false);
                 pad.transform.localPosition = new Vector3(0f, 0.02f + zone.Priority * 0.002f, 0f);
                 pad.transform.localScale = new Vector3(zone.Size.x, 0.02f, zone.Size.y);
-                Paint(pad, "Zone " + ZoneTypes.ToWireName(zone.Type), ZoneColor(zone.Type), 0.1f);
+                var color = Color.Lerp(ZoneColor(zone.Type), Color.black, zone.Priority / 100f);
+                Paint(pad, $"Zone {ZoneTypes.ToWireName(zone.Type)} {zone.Priority}", color, 0.1f);
             }
         }
 
@@ -322,27 +349,30 @@ namespace XRPod.VR
 
         static void Paint(GameObject target, string materialName, Color color, float smoothness)
         {
-            var material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            var material = MaterialAsset(materialName, "Universal Render Pipeline/Lit");
             material.SetColor("_BaseColor", color);
             material.SetFloat("_Smoothness", smoothness);
-            target.GetComponent<Renderer>().sharedMaterial = SaveMaterial(material, materialName);
+            target.GetComponent<Renderer>().sharedMaterial = material;
         }
 
-        // Updates the material file in place if it exists, so anything else
-        // using it keeps working.
-        static Material SaveMaterial(Material material, string name)
+        // The material file with this name, created if missing. An existing
+        // one is reused (not replaced), so anything else using it keeps
+        // working and the render pipeline's own settings on it are kept.
+        static Material MaterialAsset(string name, string shaderName)
         {
             var path = $"{MaterialFolder}/{name}.mat";
-            var existing = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (existing == null)
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
             {
+                material = new Material(Shader.Find(shaderName));
                 AssetDatabase.CreateAsset(material, path);
-                return material;
             }
-            existing.shader = material.shader;
-            existing.CopyPropertiesFromMaterial(material);
-            EditorUtility.SetDirty(existing);
-            return existing;
+            else if (material.shader.name != shaderName)
+            {
+                material.shader = Shader.Find(shaderName);
+            }
+            EditorUtility.SetDirty(material);
+            return material;
         }
 
         static void Save(Scene scene, string name) => EditorSceneManager.SaveScene(scene, ScenePath(name));

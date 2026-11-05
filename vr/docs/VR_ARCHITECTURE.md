@@ -87,11 +87,14 @@ One message per change, always the full current state:
 
 ```json
 {"session_id":"3f9c1a2b7d4e","seq":7,"environment":"forest",
- "zone_id":"clearing-wind","zone_type":"windy","zone_tracking":true,
+ "zone_id":"forest-clearing","zone_type":"hot","zone_tracking":true,
  "reason":"zone_entered"}
 ```
 
 `reason` is `environment_changed`, `zone_entered` or `zone_exited`.
+`zone_id` is what drives the pod: the Pi keeps a recipe (temperature, fan,
+humidity, scent) per zone id. The zones and what each should feel like are
+listed in `ZONES.md`.
 Switching environment sends one `environment_changed` message with
 `zone_type: "neutral"`; the zone reset doesn't send one of its own.
 

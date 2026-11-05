@@ -67,8 +67,8 @@ Content-Type: application/json
 | `session_id` | Random string, new each time the app starts |
 | `seq` | Counts up from 1 within a session |
 | `environment` | `beach`, `forest`, `desert`, `sponsor` |
-| `zone_id` | Zone's id, or `null` when neutral |
-| `zone_type` | `neutral`, `hot`, `cool`, `windy` |
+| `zone_id` | Zone's id, e.g. `beach-waterline`, or `null` when no zone is known. **This is what the Pi uses:** it looks up the zone's recipe (see `ZONES.md`) |
+| `zone_type` | `neutral`, `hot`, `cool`, `windy`: only a rough hint |
 | `zone_tracking` | `false` when zones aren't detected in this environment (the sponsor's, for now). `zone_type` is then always `neutral`, meaning "unknown" |
 | `reason` | `environment_changed`, `zone_entered`, `zone_exited` |
 
@@ -81,13 +81,16 @@ Suggested Pi behaviour:
 - Keep `web.py`'s protections: JSON only, `MAX_BODY_BYTES`, the `Origin`
   check (Unity sends no `Origin`, so it passes like `curl`).
 - Validate every field; reject unknown fields and values with `400`.
-- Ignore a message whose `seq` isn't higher than the last one from the
-  same `session_id` (reply `200` anyway).
+- Ignore a message whose `seq` is lower than the last one from the same
+  `session_id` (reply `200` anyway). A message with the **same** `seq` is
+  the ~5 s repeat: keep the state, but count it as "heard from the headset
+  just now", or the HUD shows "not connected" while the user stands still.
 - Keep it in memory, not a database row per step. Expose it with
   `GET /api/vr/state`, and publish a `vr` Server-Sent Event so the HUD can
-  show "VR: forest / windy zone".
-- In automatic mode, the control loop reads the latest state and applies
-  its own rules. `hardware.py`'s safety rules still apply.
+  show "VR: forest / forest-clearing".
+- In automatic mode, the control loop looks up the recipe for the current
+  `zone_id` (target temperature, fan, humidity, scent; see `ZONES.md`) and
+  applies it. `hardware.py`'s safety rules still apply.
 
 ## Why HTTP polling to start with
 

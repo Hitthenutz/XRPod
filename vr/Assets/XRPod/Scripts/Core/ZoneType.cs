@@ -1,5 +1,7 @@
-// What kind of physical effect an area of a scene is meant to suggest.
-// Unity only reports the type; the Pi decides what (if anything) to do.
+// A rough hint of what an area of a scene feels like. The zone's id is what
+// counts: the Pi looks up each zone's recipe (temperature, fan, humidity,
+// scent) by id, see vr/docs/ZONES.md. Unity only reports; the Pi decides
+// what (if anything) to do.
 
 namespace XRPod.VR.Core
 {

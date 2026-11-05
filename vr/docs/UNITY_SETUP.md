@@ -136,7 +136,8 @@ Forest, Desert. A scene missing from this list can't be loaded.
 
 In an environment scene, for each zone:
 
-1. **GameObject → 3D Object → Cube**, name it e.g. `forest-clearing-wind`.
+1. **GameObject → 3D Object → Cube**, name it with the zone's id from
+   `ZONES.md`, e.g. `forest-clearing`.
    Scale it to cover the area, and make it **tall** (e.g. Y = 4) so the
    head-height probe is inside it.
 2. Remove its **Mesh Renderer** (or keep it with a see-through material
@@ -161,7 +162,7 @@ status line top-left: `Environment: Forest / Zone: neutral`.
   sponsor's experience (ignored until it's integrated, see
   `SPONSOR_INTEGRATION.md`). **P** pretends the pod asked for one.
 - The Console logs every change, e.g.
-  `[XRPod] [forest] zone neutral -> forest-clearing-wind (windy) (Entered)`.
+  `[XRPod] [forest] zone forest-open (cool) -> forest-clearing (hot) (Entered)`.
 
 Checklist:
 
