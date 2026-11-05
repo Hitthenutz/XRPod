@@ -100,3 +100,8 @@
 .hud-range:focus-visible::-moz-range-thumb {
   box-shadow: 0 0 0 4px rgb(148 163 184 / 0.4);
 }
+/* Manual controls while auto mode is on (see App.jsx). */
+.hud-manual:disabled > * {
+  opacity: 0.5;
+  pointer-events: none;
+}
