@@ -21,8 +21,10 @@ One folder per subsystem; owners and the MQTT contract are in
 - `pi/xrpod.service`: systemd unit for the Pi
 - `esp32/<node>/`: one PlatformIO project per ESP32 wireless node
   (`esp32/scent-node/`: scent + IAQ); logic in `lib/`, unit-tested
-- `vr/README.md`: the Unity project lives in a separate repo; this explains
-  how it connects
+- `vr/`: the Unity 6.6 project for Meta Quest 3. Logic in
+  `Assets/XRPod/Scripts/Core/` (plain C#, tested by `vr/OfflineTests/`),
+  Unity components in `Assets/XRPod/Scripts/Unity/`, docs in `vr/docs/`.
+  The headset only reports environment and zone; it never drives hardware
 - `docs/`: cross-subsystem docs
 - `.github/workflows/`: `build.yml` (build check) and `security.yml`
 
@@ -33,6 +35,7 @@ cd hud && npm install && npm run build   # must pass; CI runs it
 python3 -m unittest discover -s pi -v    # must pass; CI runs it
 python3 pi/agent.py                      # run everything at :8080 (stub hardware)
 cd hud && npm run dev                    # HUD hot reload; /api proxied to :8080
+dotnet run --project vr/OfflineTests     # VR logic tests (.NET 8 SDK)
 ```
 
 ## Git and commits
@@ -60,6 +63,8 @@ cd hud && npm run dev                    # HUD hot reload; /api proxied to :8080
   before adding pip packages.
 - Heater and AC must stay mutually exclusive in the HUD, in
   `validate_patch()` (store.py) and in `apply_settings()` (hardware.py).
+- VR zone ids are the contract between the headset and auto mode: keep
+  `vr/docs/ZONES.md`, the scenes and the Pi's recipes in sync.
 - If you change a settings field or default, update `SETTINGS_SCHEMA` and
   `DEFAULT_SETTINGS` in `pi/store.py` and `DEFAULT_SETTINGS` in
   `hud/src/lib/podSettings.js`. A new scent also goes in `SCENTS` (store.py),

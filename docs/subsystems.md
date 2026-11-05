@@ -10,7 +10,7 @@ its own branch and pull request. Shared files (`README.md`, `CLAUDE.md`,
 | `pi/` | Central controller: API, storage, control loop, safety | Team | Raspberry Pi 5 |
 | `pi/` → `hardware.py` | Temperature, humidity, airflow (fans, heater, AC) | Genesis | Raspberry Pi 5 |
 | `esp32/scent-node/` | Scent + indoor air quality (BME688) | Matt | ESP32 WROOM-32 |
-| `vr/` | VR environment link (Unity repo is separate) | VR owner | Meta headsets |
+| `vr/` | VR app (Unity 6.6): environments, zone detection, reports to the Pi | Maryam | Meta Quest 3 |
 | (planned) | Data logging, VR-independent operation | Maryam | Pi |
 | (planned) | Automatic control + AI integration | Salma | Pi |
 
@@ -21,6 +21,17 @@ when it loses contact with the controller.
 
 `<subsystem>-<topic>`, e.g. `scent-esp32`, `hud-history-panel`,
 `pi-fan-pwm`. Open the PR into `main`; the folder's owner reviews it.
+
+## VR ↔ Pi (HTTP on the pod's Wi-Fi)
+
+| Request | Direction | What |
+|---|---|---|
+| `GET /api/settings` | headset reads, ~1/s | `selected_environment` (picked in the HUD) |
+| `PUT /api/vr/state` | headset → Pi, on change + every ~5 s | environment and `zone_id`; the Pi keeps the latest |
+| `GET /api/vr/state`, `vr` event | HUD reads | what the headset last reported |
+
+The headset only reports. In auto mode the Pi applies a recipe per
+`zone_id` (`vr/docs/ZONES.md`). Details: `vr/docs/POD_PROTOCOL_PROPOSAL.md`.
 
 ## Adding an ESP32 node
 

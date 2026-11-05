@@ -12,7 +12,7 @@ required.
  │  (home screen)   │ ◀─ live events ── │ store.py    settings, readings, history   │
  └──────────────────┘                   │             in SQLite (xrpod.db)         │
                                         │ hardware.py heater, AC, fan, sensors     │
- Unity (VR) ── same API ──────────────▶ │ scent.py    scent machine                │
+ Quest 3 (vr/) ─ same API ────────────▶ │ scent.py    scent machine                │
                                         └──────────────────────────────────────────┘
                                                   ▲ MQTT (Pi is the broker)
                                         ESP32 wireless nodes (esp32/<node>/)
@@ -38,7 +38,7 @@ pi/                      # Pi 5 controller (standard-library Python)
 └── xrpod.service        # systemd unit: start on boot
 esp32/                   # ESP32 wireless nodes, one PlatformIO project each
 └── scent-node/          # Scent + indoor air quality (BME688)
-vr/README.md             # How the Unity project (separate repo) connects
+vr/                      # VR app: Unity 6.6 project for Meta Quest 3 (see vr/README.md)
 docs/                    # Cross-subsystem docs (owners, MQTT topics)
 ```
 
@@ -153,7 +153,13 @@ It opens full-screen with the XRPod icon, like an app.
 | `PATCH` | `/api/settings` | Change settings, e.g. `{"fan_speed_pct": 40}`. Returns the saved settings, or `400` with an `error` message |
 | `GET` | `/api/readings/latest` | Newest sensor reading |
 | `GET` | `/api/history?limit=50` | Newest changes first |
-| `GET` | `/api/events` | Live stream (Server-Sent Events): `settings`, `reading`, `history` |
+| `GET` | `/api/vr/state` | What the headset last reported (environment, zone), or `null` |
+| `PUT` | `/api/vr/state` | The headset reports its environment and zone (see `vr/docs/POD_PROTOCOL_PROPOSAL.md`) |
+| `GET` | `/api/events` | Live stream (Server-Sent Events): `settings`, `reading`, `history`, `vr` |
+
+The VR app only reads `GET /api/settings` (for `selected_environment`) and
+sends `PUT /api/vr/state`. It never changes settings: in auto mode the Pi
+decides what each zone means for the hardware.
 
 ```bash
 curl http://xrpod.local/api/settings
