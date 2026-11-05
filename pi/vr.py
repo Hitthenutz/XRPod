@@ -19,7 +19,8 @@ import time
 
 from store import ValidationError, now_iso
 
-VR_ENVIRONMENTS = ("beach", "forest", "desert", "sponsor")
+# "none": the headset is in its waiting room (no world picked in the HUD).
+VR_ENVIRONMENTS = ("none", "beach", "forest", "desert", "sponsor")
 ZONE_TYPES = ("neutral", "hot", "cool", "windy")
 REASONS = ("environment_changed", "zone_entered", "zone_exited")
 FIELDS = ("session_id", "seq", "environment", "zone_id", "zone_type", "zone_tracking", "reason")
@@ -75,6 +76,8 @@ def validate_vr_state(msg):
         raise ValidationError("zone_type must be neutral when zone_id is null")
     if not clean["zone_tracking"] and clean["zone_id"] is not None:
         raise ValidationError("zone_id must be null when zone_tracking is false")
+    if clean["environment"] == "none" and clean["zone_tracking"]:
+        raise ValidationError("zone_tracking must be false in the waiting room (environment none)")
     return clean
 
 

@@ -177,7 +177,8 @@ class VrStateTests(unittest.TestCase):
     def test_rejects_bad_fields(self):
         bad = [
             {**GOOD_VR, "zone_type": "lava"},
-            {**GOOD_VR, "environment": "none"},
+            {**GOOD_VR, "environment": "moon"},
+            {**GOOD_VR, "environment": "none"},  # waiting room has no zones
             {**GOOD_VR, "reason": "teleported"},
             {**GOOD_VR, "seq": 0},
             {**GOOD_VR, "seq": True},
@@ -196,6 +197,16 @@ class VrStateTests(unittest.TestCase):
             with self.assertRaises(ValidationError, msg=msg):
                 self.vr.update(msg)
         self.assertIsNone(self.vr.latest())
+
+    def test_accepts_waiting_room(self):
+        # No world picked in the HUD: the headset is in its waiting room.
+        waiting = {**GOOD_VR, "environment": "none", "zone_id": None,
+                   "zone_type": "neutral", "zone_tracking": False,
+                   "reason": "environment_changed"}
+        state, changed = self.vr.update(waiting)
+        self.assertTrue(changed)
+        self.assertEqual(state["environment"], "none")
+        self.assertTrue(state["connected"])
 
     def test_late_message_is_ignored_but_new_session_wins(self):
         self.vr.update(GOOD_VR)
