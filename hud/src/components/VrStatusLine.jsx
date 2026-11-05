@@ -10,12 +10,15 @@ function zoneText(vr) {
   return vr.zone_type === "neutral" ? vr.zone_id : `${vr.zone_id} (${vr.zone_type})`;
 }
 
+// "none": no world picked; the headset shows its waiting room.
+const waiting = (env) => env === "none";
+
 /** One line showing what the headset last reported, e.g. "VR: beach / beach-waterline (cool)". */
 export function VrStatusLine({ selectedEnvironment }) {
   const { vr, connected } = useVrState();
-  // The researcher picked a world but the headset still shows another one.
-  const mismatch =
-    connected && selectedEnvironment !== "none" && vr.environment !== selectedEnvironment;
+  // The researcher picked a world (or "none", the headset's waiting room)
+  // but the headset still shows another one.
+  const mismatch = connected && vr.environment !== selectedEnvironment;
 
   return (
     <div
@@ -26,7 +29,13 @@ export function VrStatusLine({ selectedEnvironment }) {
       <Headset className="h-4 w-4 text-slate-400" aria-hidden />
       {connected ? (
         <span className="text-slate-100">
-          VR: <span className="capitalize">{vr.environment}</span> / {zoneText(vr)}
+          {waiting(vr.environment) ? (
+            "VR: waiting room (no world picked)"
+          ) : (
+            <>
+              VR: <span className="capitalize">{vr.environment}</span> / {zoneText(vr)}
+            </>
+          )}
         </span>
       ) : (
         <span className="text-slate-400">
@@ -35,7 +44,11 @@ export function VrStatusLine({ selectedEnvironment }) {
         </span>
       )}
       {mismatch && (
-        <span className="text-amber-300">Headset hasn’t switched to {selectedEnvironment} yet</span>
+        <span className="text-amber-300">
+          {waiting(selectedEnvironment)
+            ? "Headset hasn’t gone back to the waiting room yet"
+            : `Headset hasn’t switched to ${selectedEnvironment} yet`}
+        </span>
       )}
     </div>
   );
