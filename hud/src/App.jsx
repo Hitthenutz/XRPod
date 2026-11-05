@@ -3,6 +3,7 @@ import { AirflowCard } from "@/components/AirflowCard";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ReadoutsPanel } from "@/components/ReadoutsPanel";
 import { ScentCard } from "@/components/ScentCard";
+import { SessionCard } from "@/components/SessionCard";
 import { TemperatureCard } from "@/components/TemperatureCard";
 import { useLatestReading } from "@/hooks/useLatestReading";
 import { usePodSettings } from "@/hooks/usePodSettings";
@@ -53,9 +54,13 @@ export default function App() {
 
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <TemperatureCard settings={settings} onChange={applyChanges} />
-            <AirflowCard settings={settings} onChange={applyChanges} />
-            <ScentCard settings={settings} onChange={applyChanges} />
+            <SessionCard settings={settings} onChange={applyChanges} />
+            {/* In auto mode the pod's control logic owns these, so lock them. */}
+            <fieldset disabled={settings.control_mode === "auto"} className="hud-manual contents">
+              <TemperatureCard settings={settings} onChange={applyChanges} />
+              <AirflowCard settings={settings} onChange={applyChanges} />
+              <ScentCard settings={settings} onChange={applyChanges} />
+            </fieldset>
             <HistoryPanel />
           </div>
         ) : (

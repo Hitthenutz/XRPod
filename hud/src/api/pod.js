@@ -1,7 +1,6 @@
 // Client for the API served by the Pi (pi/web.py). The HUD is served
 // from the same Pi, so every path is relative; in development Vite proxies
-// /api to the Pi (see vite.config.js).
-
+// api to the Pi (see vite.config.js).
 async function request(path, options = {}) {
   const res = await fetch(`/api${path}`, {
     ...options,
@@ -29,6 +28,9 @@ export const getLatestReading = () => request("/readings/latest");
 
 export const getHistory = (limit = 50) => request(`/history?limit=${limit}`);
 
+// what the headset last reported (via the Pi) or null if it hasn't reported yet
+export const getVrState = () => request("/vr/state");
+
 // One shared live connection for the whole HUD. EventSource reconnects by
 // itself; `onOpen` fires on every (re)connect so callers can refetch anything
 // they missed while offline.
@@ -37,7 +39,7 @@ let source = null;
 
 function connect() {
   source = new EventSource("/api/events");
-  for (const type of ["settings", "reading", "history"]) {
+  for (const type of ["settings", "reading", "history", "vr"]) {
     source.addEventListener(type, (e) => {
       const data = JSON.parse(e.data);
       for (const l of listeners) l[type]?.(data);
@@ -49,7 +51,7 @@ function connect() {
 }
 
 /**
- * Subscribe to live events: `{ settings(s), reading(r), history(rows), open() }`.
+ * Subscribe to live events: `{ settings(s), reading(r), history(rows), vr(state), open() }`.
  * Returns an unsubscribe function.
  */
 export function subscribe(handlers) {

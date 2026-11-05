@@ -36,6 +36,7 @@ from pathlib import Path
 
 import hardware
 from store import Store
+from vr import VrState
 from web import EventHub, start_server
 
 HERE = Path(__file__).resolve().parent
@@ -75,8 +76,9 @@ def main():
 
     store = Store(DB_PATH)
     hub = EventHub()
+    vr = VrState()  # latest headset report; auto mode will read vr.latest()
     hardware.setup()
-    server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set)
+    server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
     loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop), name="control")
     loop.start()
 
