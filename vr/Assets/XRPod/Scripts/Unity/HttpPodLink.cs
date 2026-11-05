@@ -1,6 +1,6 @@
 // DRAFT: talks to the Pi over HTTP (which runs over TCP). The Pi doesn't
 // support this yet. It uses the endpoints proposed in
-// unity/docs/POD_PROTOCOL_PROPOSAL.md, which the Pi team still has to
+// vr/docs/POD_PROTOCOL_PROPOSAL.md, which the Pi team still has to
 // agree on and build. Until then:
 //   - reading the selection does nothing (GET /api/settings exists, but
 //     it has no selected_environment field yet),
@@ -134,7 +134,7 @@ namespace XRPod.VR
                         if (!_warnedNoStateEndpoint)
                         {
                             _warnedNoStateEndpoint = true;
-                            Debug.LogWarning("[XRPod] The Pi has no /api/vr/state endpoint yet (see unity/docs/POD_PROTOCOL_PROPOSAL.md).", this);
+                            Debug.LogWarning("[XRPod] The Pi has no /api/vr/state endpoint yet (see vr/docs/POD_PROTOCOL_PROPOSAL.md).", this);
                         }
                     }
                     else if (request.result == UnityWebRequest.Result.ProtocolError)

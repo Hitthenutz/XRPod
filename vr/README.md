@@ -1,30 +1,36 @@
 # XRPod VR (Unity)
 
-The Unity project lives in its own repo, not here. Unity projects are large
-and full of binary assets (models, textures, audio, scenes). They need Git
-LFS and a Unity-specific `.gitignore`, and keeping them here would make every
-clone of the HUD and Pi code slow.
+The VR app for Meta Quest 3. It shows the experience the operator picks in
+the HUD (beach, forest, desert or the sponsor's) and tells the Pi which
+experience and zone (hot, cool, windy, neutral) the user is in. It only
+reports: it never drives the fan, heater, AC or scent. The Pi decides what
+to do with the reports.
 
-**Suggested repo:** `Hitthenutz/XRPod-VR`. Create it from GitHub's **Unity**
-`.gitignore` template, then run `git lfs install` and track the big asset
-types (`*.fbx`, `*.png`, `*.psd`, `*.wav`, `*.unity`, …) before the first
-commit.
+This folder is the Unity project (Unity 6.6, URP, OpenXR).
 
-## How Unity can talk to the pod
+| Path | What's in it |
+|---|---|
+| `Assets/XRPod/Scripts/Core/` | The logic (zones, environments, messages), plain C# with no Unity dependency |
+| `Assets/XRPod/Scripts/Unity/` | The Unity components that connect the logic to scenes |
+| `OfflineTests/` | Tests for the logic that run without Unity |
+| `docs/` | How it fits together, setup, sponsor content, the Pi protocol |
+| `.gitignore` | Keeps Unity's generated folders (`Library/`, `Temp/`, builds) out of git |
 
-The Pi serves a small JSON API on the pod's network (full list in the main
-README's **API** section). Unity can use it with `UnityWebRequest`; the
-headset must be on the same Wi-Fi as the Pi.
+## Start here
 
-- **Read what the pod is doing:** `GET http://xrpod.local/api/settings` and
-  `GET http://xrpod.local/api/readings/latest`. Polling every second or two
-  is fine; there's no usage limit.
-- **Drive the pod from a scene** (e.g. a forest scene turns on pine scent):
-  `PATCH http://xrpod.local/api/settings` with
-  `Content-Type: application/json` and a body like
-  `{"selected_scent": "pine", "scent_intensity_pct": 60}`. The Pi validates
-  it and still enforces every hardware safety rule. The change also shows up
-  in the HUD and its History panel.
-- **Live updates without polling:** `GET /api/events` is a Server-Sent Events
-  stream (`settings`, `reading` and `history` events). Unity has no built-in
-  SSE client, so polling is simpler unless you need instant updates.
+- [docs/VR_ARCHITECTURE.md](docs/VR_ARCHITECTURE.md): how the code fits together
+- [docs/UNITY_SETUP.md](docs/UNITY_SETUP.md): setting up the project and building for the Quest 3
+- [docs/SPONSOR_INTEGRATION.md](docs/SPONSOR_INTEGRATION.md): adding the sponsor's experience
+- [docs/POD_PROTOCOL_PROPOSAL.md](docs/POD_PROTOCOL_PROPOSAL.md): how the headset and the Pi talk
+
+Run the tests (needs the .NET 8 SDK) from the repo root:
+
+```bash
+dotnet run --project vr/OfflineTests
+```
+
+## Large files
+
+Models, textures and audio are binary and can be big. Agree on Git LFS
+with the team before committing them, and don't commit the sponsor's
+content without their permission.

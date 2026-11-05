@@ -6,7 +6,7 @@
   LangVersion 9 matches Unity 6, so Core can't accidentally use C# features
   Unity doesn't support.
 
-  Run it from the repo root (commands in unity/docs/UNITY_SETUP.md, step 0):
+  Run it from the repo root (commands in vr/docs/UNITY_SETUP.md, step 0):
   "dotnet run" with this project runs the tests; add the "demo" argument
   for a narrated walkthrough.
 -->

@@ -28,7 +28,7 @@ step, the exact rules, and commands to test without a headset.
   `xrpod.local` may not resolve on the Quest.
 - **TCP:** HTTP runs over TCP, so this proposal is TCP over Wi-Fi, as in
   the original plan, using the web server the Pi already runs
-  (`pi-agent/web.py`). A custom TCP socket protocol would also work, and
+  (`pi/web.py`). A custom TCP socket protocol would also work, and
   Unity is built so it could switch (see the end).
 - **MQTT** (Pi ↔ ESP32 hardware) is separate and unaffected.
 
@@ -37,11 +37,11 @@ step, the exact rules, and commands to test without a headset.
 Add `selected_environment` to the settings, like every other HUD control.
 It then gets validation, history and live updates for free:
 
-- `pi-agent/store.py`:
+- `pi/store.py`:
   `ENVIRONMENTS = ("none", "beach", "forest", "desert", "sponsor")`,
   `SETTINGS_SCHEMA["selected_environment"]` (validated like `selected_scent`),
   `DEFAULT_SETTINGS["selected_environment"] = "none"`
-- `src/lib/podSettings.js`: the same default, plus a picker in the HUD
+- `hud/src/lib/podSettings.js`: the same default, plus a picker in the HUD
 
 Unity polls `GET /api/settings` (already exists) about once a second and
 switches when `selected_environment` **changes**. It ignores `"none"` and
@@ -119,8 +119,8 @@ else changing in Unity. The message fields above would stay the same.
 - Does the Pi run the Wi-Fi hotspot? What address should Unity use?
 - Should the Pi treat VR state older than N seconds as "VR disconnected"?
 - What should automatic mode do when `zone_tracking` is `false` (sponsor)?
-- `vr/README.md` on `main` suggests Unity `PATCH`es settings directly.
-  Should that be replaced by this? Doing both would let Unity drive the
+- An older `vr/README.md` suggested Unity `PATCH`es settings directly.
+  This proposal replaces that: doing both would let Unity drive the
   hardware, which goes against the report-only design.
 
 ## Checklist for the Pi/HUD teammate
@@ -145,7 +145,7 @@ tell the VR side so both match.
 > The headset never sends fan/heater/AC/scent values. What to do with a
 > zone (in automatic mode) is up to the Pi.
 
-### Step 1: the setting (`pi-agent/store.py`)
+### Step 1: the setting (`pi/store.py`)
 
 Same pattern as `selected_scent`:
 
@@ -156,16 +156,16 @@ Same pattern as `selected_scent`:
 Because it's a normal setting, `PATCH /api/settings` already saves it,
 logs it in history and pushes it to the HUD. Nothing else is needed.
 
-### Step 2: the HUD picker (`src/`)
+### Step 2: the HUD picker (`hud/src/`)
 
 - Add `selected_environment: "none"` to `DEFAULT_SETTINGS` in
-  `src/lib/podSettings.js` (and the list of worlds, like `SCENTS`).
+  `hud/src/lib/podSettings.js` (and the list of worlds, like `SCENTS`).
 - Add a picker (Beach / Forest / Desert / Sponsor / None). Save through
   `applyChanges()` in `usePodSettings.js` like every other control.
 - Nice to have: show the latest VR state, e.g. "VR: Forest, windy zone"
   (see step 3), or "VR: not connected" if nothing arrived for ~15 s.
 
-### Step 3: the endpoint (`pi-agent/web.py`)
+### Step 3: the endpoint (`pi/web.py`)
 
 `PUT /api/vr/state` (today `do_PUT` answers every path with `405`):
 
@@ -199,7 +199,7 @@ logs it in history and pushes it to the HUD. Nothing else is needed.
 Two extra checks: if `zone_id` is `null`, `zone_type` must be `neutral`;
 if `zone_tracking` is `false`, `zone_id` must be `null`.
 
-### Step 4: tests (`pi-agent/test_pod.py`)
+### Step 4: tests (`pi/test_pod.py`)
 
 At least: a good message is accepted, each bad field gets `400`, an unknown
 field gets `400`, an old `seq` doesn't replace a newer one, a new
@@ -210,7 +210,7 @@ field gets `400`, an old `seq` doesn't replace a newer one, a new
 
 These pretend to be the headset. Run them on the Pi (`localhost`); from
 another computer use the Pi's address. The Pi service uses port 80, so
-drop `:8080` there; `python3 pi-agent/agent.py` on a laptop uses 8080.
+drop `:8080` there; `python3 pi/agent.py` on a laptop uses 8080.
 
 Pick a world, as the HUD would:
 
@@ -244,7 +244,7 @@ curl -i http://localhost:8080/api/vr/state
 ```
 
 These example messages are copied from what the VR code really produces
-(`dotnet run --project unity/OfflineTests -- demo`).
+(`dotnet run --project vr/OfflineTests -- demo`).
 
 ### What the VR side needs back
 

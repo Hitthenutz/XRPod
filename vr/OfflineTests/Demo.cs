@@ -1,6 +1,6 @@
 // A narrated walk through a session, printing every event and every message
 // that would go to the Pi. Run with:
-//   dotnet run --project unity/OfflineTests -- demo
+//   dotnet run --project vr/OfflineTests -- demo
 
 using System;
 using XRPod.VR.Core;

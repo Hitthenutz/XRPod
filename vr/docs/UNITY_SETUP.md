@@ -12,32 +12,30 @@ and fix them as you go.
 - **Run the offline tests first** (needs the .NET 8 SDK:
   `winget install Microsoft.DotNet.SDK.8`):
   ```bash
-  dotnet run --project unity/OfflineTests
+  dotnet run --project vr/OfflineTests
   ```
   ```bash
-  dotnet run --project unity/OfflineTests -- demo
+  dotnet run --project vr/OfflineTests -- demo
   ```
-- **Agree on `.gitignore` and Git LFS with the team before committing
-  any Unity-generated files.** Two unmerged branches
-  (`claude/compassionate-bohr-c1rd20`, `feature/iaq-scent-mqtt`) already
-  have a `unity/.gitignore` and LFS rules in `.gitattributes`. Without
-  them, `Library/` (gigabytes) and binary assets would end up in git. The
-  scripts and docs on this branch are safe to commit now.
+- **`vr/.gitignore` keeps Unity's generated folders out of git**
+  (`Library/` is gigabytes). Before committing big binary files (models,
+  textures, audio), agree on Git LFS with the team.
 
-## 1. Create the project inside `unity/`
+## 1. Create the project inside `vr/`
 
-Unity Hub won't create a project in a folder that already has files, and
-`unity/` already holds `Assets/XRPod/` and `OfflineTests/`.
+`vr/` is the Unity project folder. Unity Hub won't create a project in a
+folder that already has files, and `vr/` already holds `Assets/XRPod/`,
+`OfflineTests/` and `docs/`.
 
 1. Unity Hub → **New project** → template **Universal 3D** (URP). Name it
    `XRPodVR` and put it **outside** the repo, e.g. `C:\Users\<you>\XRPodVR`.
    Let it open once, then close Unity.
-2. In File Explorer, copy from `XRPodVR` into the repo's `unity/` folder:
+2. In File Explorer, copy from `XRPodVR` into the repo's `vr/` folder:
    - `Packages/` and `ProjectSettings/`
-   - the **contents** of `XRPodVR/Assets/` into `unity/Assets/` (merge;
+   - the **contents** of `XRPodVR/Assets/` into `vr/Assets/` (merge;
      keep our `Assets/XRPod/` folder)
 3. Unity Hub → **Add** → **Add project from disk** → choose the repo's
-   `unity/` folder. Open it with **6.6**. Delete the temporary `XRPodVR`.
+   `vr/` folder. Open it with **6.6**. Delete the temporary `XRPodVR`.
 4. **Edit → Project Settings → Editor**: Version Control mode **Visible Meta
    Files**, Asset Serialization **Force Text** (scenes merge as text).
 5. Check the **Console** (Window → General → Console). Our scripts should

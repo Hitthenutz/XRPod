@@ -6,7 +6,7 @@
 //
 // Sponsor is the experience our sponsor provides. It starts out
 // unavailable, with zone tracking off, until their files are integrated
-// (see EnvironmentController and unity/docs/SPONSOR_INTEGRATION.md).
+// (see EnvironmentController and vr/docs/SPONSOR_INTEGRATION.md).
 
 namespace XRPod.VR.Core
 {

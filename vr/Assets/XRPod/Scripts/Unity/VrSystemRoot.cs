@@ -20,7 +20,7 @@ namespace XRPod.VR
         [Tooltip("Log every zone and environment change to the Console.")]
         [SerializeField] bool logEvents = true;
 
-        [Header("Sponsor environment (see unity/docs/SPONSOR_INTEGRATION.md)")]
+        [Header("Sponsor environment (see vr/docs/SPONSOR_INTEGRATION.md)")]
         [Tooltip("Tick once the sponsor's scene is in the project and set in EnvironmentSceneLoader.")]
         [SerializeField] bool sponsorAvailable;
 

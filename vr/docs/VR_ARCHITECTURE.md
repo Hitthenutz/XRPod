@@ -22,7 +22,7 @@ automatic mode. Zone detection works the same in both modes.
 
 | Folder | Uses Unity? | Tested how |
 |---|---|---|
-| `Assets/XRPod/Scripts/Core/` | No. The `XRPod.VR.Core` assembly has *No Engine References* set, so Unity refuses to compile it if `UnityEngine` creeps in | `unity/OfflineTests` on any PC with the .NET 8 SDK |
+| `Assets/XRPod/Scripts/Core/` | No. The `XRPod.VR.Core` assembly has *No Engine References* set, so Unity refuses to compile it if `UnityEngine` creeps in | `vr/OfflineTests` on any PC with the .NET 8 SDK |
 | `Assets/XRPod/Scripts/Unity/` | Yes (MonoBehaviours) | In the Unity Editor and on the headset |
 
 All the decisions live in Core. The Unity scripts only translate Unity
