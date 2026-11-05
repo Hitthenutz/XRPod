@@ -1,12 +1,12 @@
-// DRAFT: talks to the Pi over HTTP (which runs over TCP). The Pi doesn't
-// support this yet. It uses the endpoints proposed in
-// vr/docs/POD_PROTOCOL_PROPOSAL.md, which the Pi team still has to
-// agree on and build. Until then:
-//   - reading the selection does nothing (GET /api/settings exists, but
-//     it has no selected_environment field yet),
-//   - sending state gets a 404 or 405 (PUT /api/vr/state doesn't exist),
-//     logged once.
-// Leave VrSystemRoot's Pod Link empty to run offline instead.
+// Talks to the Pi over HTTP (which runs over TCP), as described in
+// vr/docs/POD_PROTOCOL_PROPOSAL.md. Add it to the XRPod object in Bootstrap
+// and drag it onto VrSystemRoot's Pod Link; leave Pod Link empty to run
+// offline instead (keyboard only).
+//
+// Base Url: http://localhost:8080 when the Pi software runs on this PC,
+// otherwise the Pi's address on the pod's Wi-Fi (see UNITY_SETUP.md step 8).
+// The Pi serves plain HTTP, so Player Settings > Allow downloads over HTTP
+// must be Always allowed.
 //
 // This is the only file that knows about HTTP. A different transport
 // (e.g. a raw TCP socket) would be another IPodLink class next to it.
@@ -28,8 +28,9 @@ namespace XRPod.VR
 {
     public sealed class HttpPodLink : MonoBehaviour, IPodLink
     {
-        [Tooltip("The Pi's address. The Pi's IP (e.g. http://192.168.1.50) is more reliable on Quest than xrpod.local.")]
-        [SerializeField] string baseUrl = "http://xrpod.local";
+        [Tooltip("The Pi's address: http://localhost:8080 when the Pi software runs on this PC, or the Pi's IP on the pod's Wi-Fi " +
+                 "(e.g. http://10.199.194.129 on Zainab's hotspot; check with hostname -I on the Pi). xrpod.local may not work on the Quest.")]
+        [SerializeField] string baseUrl = "http://localhost:8080";
         [SerializeField] float pollSeconds = 1f;
         [SerializeField] float resendSeconds = 5f;
         [SerializeField] int timeoutSeconds = 3;
@@ -134,7 +135,7 @@ namespace XRPod.VR
                         if (!_warnedNoStateEndpoint)
                         {
                             _warnedNoStateEndpoint = true;
-                            Debug.LogWarning("[XRPod] The Pi has no /api/vr/state endpoint yet (see vr/docs/POD_PROTOCOL_PROPOSAL.md).", this);
+                            Debug.LogWarning($"[XRPod] {baseUrl} has no /api/vr/state. Is Base Url the Pi, and is its code up to date (main)?", this);
                         }
                     }
                     else if (request.result == UnityWebRequest.Result.ProtocolError)

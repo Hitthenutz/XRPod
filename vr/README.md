@@ -2,9 +2,10 @@
 
 The VR app for Meta Quest 3. It shows the experience the operator picks in
 the HUD (beach, forest, desert or the sponsor's) and tells the Pi which
-experience and zone (hot, cool, windy, neutral) the user is in. It only
-reports: it never drives the fan, heater, AC or scent. The Pi decides what
-to do with the reports.
+experience and zone (e.g. `beach-waterline`) the user is in. It only
+reports: it never drives the fan, heater, AC or scent. In auto mode the Pi
+applies each zone's recipe. It runs on the pod's own Wi-Fi; no internet
+needed.
 
 This folder is the Unity project (Unity 6.6, URP, OpenXR).
 
@@ -22,6 +23,9 @@ This folder is the Unity project (Unity 6.6, URP, OpenXR).
 - [docs/UNITY_SETUP.md](docs/UNITY_SETUP.md): setting up the project and building for the Quest 3
 - [docs/SPONSOR_INTEGRATION.md](docs/SPONSOR_INTEGRATION.md): adding the sponsor's experience
 - [docs/POD_PROTOCOL_PROPOSAL.md](docs/POD_PROTOCOL_PROPOSAL.md): how the headset and the Pi talk
+- [docs/ZONES.md](docs/ZONES.md): every zone, where it is and how it should feel (for auto mode's recipes)
+
+Quick test worlds: menu **XRPod → Create Test Scenes** in Unity.
 
 Run the tests (needs the .NET 8 SDK) from the repo root:
 

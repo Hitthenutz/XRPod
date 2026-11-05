@@ -1,14 +1,14 @@
-# Proposal: how the Pi and the VR app talk
+# How the Pi and the VR app talk
 
-**Status: draft, not agreed.** To be confirmed with the central-system
-(Pi) teammate. Nothing here exists on the Pi yet, and nothing on the Pi
-has been changed. Unity's `HttpPodLink.cs` is a draft written against this
-proposal. If the team picks something else, only that one file changes;
-zone detection and environment switching don't.
+**Status: agreed and built (November 2026).** The Pi side (`pi/vr.py`,
+`pi/web.py`, `pi/store.py`) and the HUD (Manual/Auto switch, environment
+picker, VR status line) are on `main`. Unity's `HttpPodLink.cs` uses it.
+This file is the reference for the message format. If the transport ever
+changes, only `HttpPodLink.cs` changes on the Unity side; zone detection
+and environment switching don't.
 
-**Pi/HUD teammate:** start with the
-[checklist at the end](#checklist-for-the-pihud-teammate). It lists every
-step, the exact rules, and commands to test without a headset.
+The [checklist at the end](#checklist-for-the-pihud-teammate) is what the
+Pi side was built from, with commands to test it without a headset.
 
 ## What's needed
 
@@ -22,10 +22,17 @@ step, the exact rules, and commands to test without a headset.
 
 ## Network and transport
 
-- **Wi-Fi:** Quest 3 and Pi on the same network. To be confirmed: the Pi
-  may run the hotspot itself, in which case it has a fixed address (often
-  `10.42.0.1` with NetworkManager's hotspot) that Unity can use directly.
-  `xrpod.local` may not resolve on the Quest.
+- **Wi-Fi, no internet:** the pod runs on its own local Wi-Fi. The headset,
+  the Pi, the HUD and the ESP32 nodes only talk to each other, so no
+  internet is needed. Phones and the Quest may warn "connected, no
+  internet": choose to stay connected, and forget other saved networks on
+  the pod's headset so it doesn't switch away.
+- **The Pi's address:** for now the Pi joins Zainab's hotspot, where it's
+  at `10.199.194.129`. A hotspot hands out addresses, so this can change
+  when the Pi reconnects (check with `hostname -I` on the Pi). The plan is
+  for the Pi to run its own hotspot; then it is the router and its address
+  never changes (often `10.42.0.1` with NetworkManager). Use the address in
+  Unity: `xrpod.local` may not resolve on the Quest.
 - **TCP:** HTTP runs over TCP, so this proposal is TCP over Wi-Fi, as in
   the original plan, using the web server the Pi already runs
   (`pi/web.py`). A custom TCP socket protocol would also work, and
@@ -116,21 +123,27 @@ send "here's the state"). A raw TCP version would be a new `TcpPodLink.cs`
 sending the same JSON, one message per line, over a socket, with nothing
 else changing in Unity. The message fields above would stay the same.
 
+## Decided
+
+- HTTP polling to start with (above).
+- After 15 s without hearing from the headset the Pi reports
+  `connected: false` and the HUD shows "VR: not connected". The headset's
+  ~5 s repeat counts as hearing from it.
+- Unity only reports. It never `PATCH`es settings (an older `vr/README.md`
+  suggested it; doing both would let Unity drive the hardware).
+- Auto mode looks up a recipe per `zone_id` (`ZONES.md`).
+
 ## Open questions
 
-- HTTP polling now, or a persistent connection from the start?
-- Does the Pi run the Wi-Fi hotspot? What address should Unity use?
-- Should the Pi treat VR state older than N seconds as "VR disconnected"?
-- What should automatic mode do when `zone_tracking` is `false` (sponsor)?
-- An older `vr/README.md` suggested Unity `PATCH`es settings directly.
-  This proposal replaces that: doing both would let Unity drive the
-  hardware, which goes against the report-only design.
+- Does the Pi run its own hotspot (fixed address), or keep joining
+  Zainab's hotspot (address can change)?
+- What should automatic mode do when `zone_tracking` is `false` (sponsor)
+  or `zone_id` is `null`?
 
 ## Checklist for the Pi/HUD teammate
 
-Everything you'd need to build your side, in order. Nothing here is
-built yet, and it's a proposal: change anything that doesn't fit, just
-tell the VR side so both match.
+What the Pi side was built from, in order (done). Kept as a reference and
+for the test commands; if anything changes, update both sides.
 
 ### The short version
 

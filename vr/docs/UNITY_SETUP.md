@@ -167,11 +167,13 @@ status line top-left: `Environment: Forest / Zone: neutral`.
 Checklist:
 
 - [ ] Walk into a zone: exactly one "Entered" log
-- [ ] Walk out: one "Exited" log, zone back to neutral
+- [ ] Walk out: one "Exited" log, zone back to the world's base zone
+      (e.g. `forest-open`)
 - [ ] Overlap two zones: the right one is active (priority, then newest);
       leaving the inner one falls back to the outer one
-- [ ] Switch environment while inside a zone: zone goes neutral, new scene
-      loads, the old scene is gone (Hierarchy shows Bootstrap + one scene)
+- [ ] Switch environment while inside a zone: the new scene loads, the old
+      one is gone (Hierarchy shows Bootstrap + one scene), and the zone
+      becomes the new world's base zone
 - [ ] Spam 1/2/3 quickly: you end up in the last one you pressed, no errors
 - [ ] "Last sent" on screen changes only when the zone/environment changes
 
@@ -191,22 +193,35 @@ Checklist:
 6. **Build And Run** with the headset selected as Run Device. The app shows
    up in the headset's Library under **Unknown Sources**.
 
-## 8. Connect to the Pi (later)
+## 8. Connect to the Pi
 
-The Pi doesn't have the VR endpoints yet (see `POD_PROTOCOL_PROPOSAL.md`).
-Once it does:
+The Pi's VR support and the HUD's environment picker are on `main` (see
+`POD_PROTOCOL_PROPOSAL.md`). Without a Pi, Unity runs offline and only
+the keyboard switches worlds.
 
-1. Add **Http Pod Link** to the `XRPod` object; set **Base Url** to the Pi's
-   IP, e.g. `http://192.168.1.50`. `xrpod.local` may not resolve on the
-   Quest.
-2. Drag the `XRPod` object's Http Pod Link component into **Vr System Root
-   → Pod Link**.
-3. Quest and Pi on the same Wi-Fi. Pick an environment in the HUD; the
-   headset should switch within ~1 s.
+1. In the Bootstrap scene, select the `XRPod` object → **Add Component →
+   Http Pod Link**. Set **Base Url**:
+   - testing on this PC: `http://localhost:8080`, with the Pi software
+     running here (`python pi/agent.py` from the repo root; the HUD is then
+     at `http://localhost:8080`)
+   - the real Pi: its address, e.g. `http://10.199.194.129` on Zainab's
+     hotspot (no port needed, the Pi uses 80). `xrpod.local` may not
+     resolve on the Quest.
+2. Drag the Http Pod Link component onto **Vr System Root → Pod Link**.
+   (Empty Pod Link = offline.)
+3. **Edit → Project Settings → Player → Other Settings → Allow downloads
+   over HTTP: Always allowed.** The Pi serves plain HTTP.
+4. Save, press **Play**, and pick an environment in the HUD: Unity should
+   switch within ~1 s. Walk into zones: the HUD's VR line shows e.g.
+   `VR: desert / desert-cave-inside (cool)` with a green dot.
+
+On the headset, the Quest and the Pi must be on the same Wi-Fi. It has no
+internet; that's fine.
 
 ## Not done yet
 
 - Spawn point per environment (the player keeps their position when
   switching).
 - Fade to black during scene switches (more comfortable in VR).
+- Changing the Pi's address in the headset without rebuilding the app.
 - Real environment art, sound and zone layouts.
