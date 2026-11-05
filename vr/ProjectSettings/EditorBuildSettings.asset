@@ -6,7 +6,16 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/XRPod/Scenes/Bootstrap.unity
+    guid: 268baa8e1aae4724fa167cba9e9a193a
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Beach.unity
+    guid: 6d0c9bae2d72864458c2c8c9a1ec0e22
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Forest.unity
+    guid: 5dc707ca61ddea046a7473ce2d38ece9
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Desert.unity
+    guid: 19381e7c9c6405e4ab54207b55c06f0b
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

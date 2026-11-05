@@ -8,8 +8,9 @@
 // It also shows the current environment and zone in the top-left corner of
 // the Game view. The overlay isn't visible in the headset.
 //
-// To walk around in the Editor, use the XR Interaction Toolkit's
-// XR Device Simulator (see vr/docs/UNITY_SETUP.md).
+// To walk around in the Editor, use DesktopTestMover (WASD + right mouse)
+// or the XR Interaction Toolkit's XR Device Simulator (see
+// vr/docs/UNITY_SETUP.md).
 
 using UnityEngine;
 using XRPod.VR.Core;

@@ -42,6 +42,29 @@ folder that already has files, and `vr/` already holds `Assets/XRPod/`,
    compile with no errors. Unity creates a `.meta` file next to every
    script; commit them along with the scripts.
 
+## Quick start: test scenes in one click
+
+Once the project opens, menu **XRPod → Create Test Scenes** builds
+placeholder versions of steps 3 to 5 for you (`XRPodSceneBuilder.cs`):
+
+- `Assets/XRPod/Scenes/Bootstrap.unity`: the `XRPod` object (Vr System
+  Root, Environment Scene Loader, Editor Test Controls) and a **desktop
+  test player**: a camera at head height with the zone probe, moved with
+  the keyboard and mouse (`DesktopTestMover`)
+- `Beach`, `Forest`, `Desert`: coloured ground, a sky, simple shapes and
+  three example zones each. A coloured pad marks each zone: red = hot,
+  blue = cool, white = windy. The desert's cool cave sits inside its hot
+  area to test overlapping zones.
+- the Build Profile's scene list: Bootstrap, Beach, Forest, Desert
+
+Open Bootstrap and press **Play**. **1 / 2 / 3** switch worlds, **W A S D**
+walk (Shift: faster), hold the **right mouse button** to look around. Then
+go through the checklist in step 6.
+
+Running it again replaces those four scenes (it asks first). The desktop
+player is only for testing on the computer; step 3 replaces it with the
+XR Origin for the headset.
+
 ## 2. XR packages
 
 **Window → Package Manager → Unity Registry**, install:

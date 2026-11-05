@@ -52,6 +52,8 @@ callbacks (triggers, scene loading, HTTP) into calls on Core.
 | `ZoneVolume.cs` | Each zone's trigger collider in an environment scene | Reports enter/exit to the tracker |
 | `EnvironmentSceneLoader.cs` | The Bootstrap scene | Loads/unloads environment scenes additively |
 | `EditorTestControls.cs` | The Bootstrap scene | Keys 1/2/3 switch environment; on-screen status |
+| `DesktopTestMover.cs` | The desktop test player in Bootstrap | Walk with WASD and the mouse in the Editor; off while a headset is in use |
+| `Editor/XRPodSceneBuilder.cs` | (Editor menu) | **XRPod → Create Test Scenes** builds placeholder Bootstrap, Beach, Forest and Desert scenes |
 | `HttpPodLink.cs` | The Bootstrap scene (optional) | **Draft** HTTP link to the Pi, see `POD_PROTOCOL_PROPOSAL.md` |
 
 ## Zone rules
