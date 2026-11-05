@@ -274,6 +274,43 @@ namespace XRPod.VR.OfflineTests
                 Equal(1, h.Diagnostics.Count, "diagnostics");
             }),
 
+            new TestCase("pod repeating its choice keeps the headset in step", () =>
+            {
+                // HttpPodLink passes on the HUD's choice every poll.
+                var h = new Harness();
+                h.Link.SimulateEnvironmentRequest("beach");
+                h.Link.SimulateEnvironmentRequest("beach");
+                h.Link.SimulateEnvironmentRequest("beach");
+                Equal(1, h.Link.Published.Count, "messages");
+
+                // Someone pressed a key in the Editor; the next poll wins.
+                h.Environments.Request(EnvironmentId.Desert, "keyboard");
+                h.Link.SimulateEnvironmentRequest("beach");
+                Equal(EnvironmentId.Beach, h.Environments.Current, "back in step");
+                Equal(0, h.Diagnostics.Count, "diagnostics");
+            }),
+
+            new TestCase("pod choice 'none' keeps the current environment quietly", () =>
+            {
+                var h = new Harness();
+                h.Link.SimulateEnvironmentRequest("none");
+                h.Link.SimulateEnvironmentRequest("None ");
+                Equal(EnvironmentId.Forest, h.Environments.Current, "environment");
+                Equal(0, h.Diagnostics.Count, "diagnostics");
+            }),
+
+            new TestCase("a repeated bad request is logged once, again after a good one", () =>
+            {
+                var h = new Harness();
+                h.Link.SimulateEnvironmentRequest("sponsor");
+                h.Link.SimulateEnvironmentRequest("sponsor");
+                h.Link.SimulateEnvironmentRequest("sponsor");
+                Equal(1, h.Diagnostics.Count, "logged once");
+                h.Link.SimulateEnvironmentRequest("forest");
+                h.Link.SimulateEnvironmentRequest("sponsor");
+                Equal(2, h.Diagnostics.Count, "logged again after a good request");
+            }),
+
             new TestCase("message JSON matches the proposed format", () =>
             {
                 var m = new PodStateMessage

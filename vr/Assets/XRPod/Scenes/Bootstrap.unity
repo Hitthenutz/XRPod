@@ -131,6 +131,7 @@ GameObject:
   - component: {fileID: 755827249}
   - component: {fileID: 755827248}
   - component: {fileID: 755827247}
+  - component: {fileID: 755827251}
   m_Layer: 0
   m_Name: XRPod
   m_TagString: Untagged
@@ -185,7 +186,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.VrSystemRoot
   startEnvironment: 2
-  podLink: {fileID: 0}
+  podLink: {fileID: 755827251}
   logEvents: 1
   sponsorAvailable: 0
   sponsorZoneTracking: 0
@@ -204,6 +205,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &755827251
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 755827246}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a45a4f50265c8444cb4111dc7acd5413, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.HttpPodLink
+  baseUrl: http://localhost:8080
+  pollSeconds: 1
+  resendSeconds: 5
+  timeoutSeconds: 3
 --- !u!1 &912919130
 GameObject:
   m_ObjectHideFlags: 0

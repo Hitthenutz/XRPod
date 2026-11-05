@@ -218,10 +218,16 @@ the keyboard switches worlds.
 On the headset, the Quest and the Pi must be on the same Wi-Fi. It has no
 internet; that's fine.
 
+## Switching worlds
+
+The view fades to black, the new world loads, the user is moved to its
+start spot, and the view fades back in (`ScreenFader`, set up by
+Environment Scene Loader; **Fade Seconds** there). To choose the start
+spot in a world, add an empty object on the floor with **Environment Spawn
+Point**, facing where the user should look (a green marker shows it in the
+Scene view). Without one, the user starts at the scene's origin facing +Z.
+
 ## Not done yet
 
-- Spawn point per environment (the player keeps their position when
-  switching).
-- Fade to black during scene switches (more comfortable in VR).
 - Changing the Pi's address in the headset without rebuilding the app.
 - Real environment art, sound and zone layouts.

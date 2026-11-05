@@ -26,6 +26,14 @@ namespace XRPod.VR
 
         int _podRequestIndex;
 
+        void Awake()
+        {
+            // Keep playing while you click the HUD in a browser. Otherwise
+            // the Editor pauses the game, it stops talking to the Pi, and the
+            // HUD shows "VR: not connected". (No effect on the Quest.)
+            Application.runInBackground = true;
+        }
+
         void Update()
         {
 #if ENABLE_INPUT_SYSTEM

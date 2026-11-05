@@ -50,7 +50,9 @@ callbacks (triggers, scene loading, HTTP) into calls on Core.
 | `VrSystemRoot.cs` | An object in the Bootstrap scene | Creates the `VrSession`; picks the start environment |
 | `PlayerZoneProbe.cs` | A child of the XR Origin's Main Camera | Marks the one collider that counts as "the player" |
 | `ZoneVolume.cs` | Each zone's trigger collider in an environment scene | Reports enter/exit to the tracker |
-| `EnvironmentSceneLoader.cs` | The Bootstrap scene | Loads/unloads environment scenes additively |
+| `EnvironmentSceneLoader.cs` | The Bootstrap scene | Loads/unloads environment scenes additively; fades and moves the player to the start spot |
+| `ScreenFader.cs` | (created by the loader) | Fades the view to black and back during a switch |
+| `EnvironmentSpawnPoint.cs` | An empty object in each environment scene | Where the user starts in that world |
 | `EditorTestControls.cs` | The Bootstrap scene | Keys 1/2/3 switch environment; on-screen status |
 | `DesktopTestMover.cs` | The desktop test player in Bootstrap | Walk with WASD and the mouse in the Editor; off while a headset is in use |
 | `Editor/XRPodSceneBuilder.cs` | (Editor menu) | **XRPod → Create Test Scenes** builds placeholder Bootstrap, Beach, Forest and Desert scenes |

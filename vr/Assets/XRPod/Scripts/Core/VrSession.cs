@@ -18,6 +18,7 @@ namespace XRPod.VR.Core
     {
         readonly IPodLink _link;
         long _seq;
+        string _lastWarning;
 
         public VrSession(IPodLink link, string sessionId = null)
         {
@@ -49,11 +50,26 @@ namespace XRPod.VR.Core
 
         void OnEnvironmentRequested(string name)
         {
+            // "none": nothing picked in the HUD yet, so keep showing the
+            // current environment. Not a problem worth a warning.
+            if (string.Equals(name?.Trim(), "none", StringComparison.OrdinalIgnoreCase)) return;
+
             var result = Environments.Request(name, "pod");
             if (result == EnvironmentRequestResult.Invalid)
-                Diagnostic?.Invoke($"Pod asked for unknown environment '{name}'; ignored.");
+                Warn($"Pod asked for unknown environment '{name}'; ignored.");
             else if (result == EnvironmentRequestResult.Unavailable)
-                Diagnostic?.Invoke($"Pod asked for '{name}', which isn't available in this build; ignored.");
+                Warn($"Pod asked for '{name}', which isn't available in this build; ignored.");
+            else
+                _lastWarning = null;
+        }
+
+        // The link repeats the pod's choice every poll, so warn once per
+        // problem rather than every second.
+        void Warn(string message)
+        {
+            if (message == _lastWarning) return;
+            _lastWarning = message;
+            Diagnostic?.Invoke(message);
         }
 
         void OnEnvironmentChanged(EnvironmentChangedEvent e) => Publish("environment_changed");

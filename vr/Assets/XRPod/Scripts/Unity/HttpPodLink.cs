@@ -40,7 +40,6 @@ namespace XRPod.VR
         PodStateMessage _latest;
         bool _dirty;
         float _lastSentTime = float.NegativeInfinity;
-        string _lastSelection;
         bool _warnedNoStateEndpoint;
         bool _warnedUnreachable;
 
@@ -101,10 +100,11 @@ namespace XRPod.VR
                 return;
             }
             var selection = settings?.selected_environment;
-            // React only to changes, so selecting an environment in the
-            // Editor isn't undone by the next poll.
-            if (string.IsNullOrEmpty(selection) || selection == _lastSelection) return;
-            _lastSelection = selection;
+            // Pass on the HUD's choice every poll, not only when it changes,
+            // so the headset always ends up where the HUD says, e.g. after a
+            // restart. While connected the HUD is in charge: keyboard keys
+            // in the Editor are undone by the next poll.
+            if (string.IsNullOrEmpty(selection)) return;
             EnvironmentRequested?.Invoke(selection);
         }
 

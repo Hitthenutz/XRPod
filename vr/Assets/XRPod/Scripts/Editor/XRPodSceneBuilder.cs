@@ -254,6 +254,9 @@ namespace XRPod.VR
             floor.transform.localScale = new Vector3(10f, 1f, 10f); // 100 x 100 m
             Paint(floor, name + " ground", ground, 0.1f);
 
+            // Where the user appears when this world loads (facing +z).
+            new GameObject("Player start").AddComponent<EnvironmentSpawnPoint>();
+
             // Environment scenes become the active scene when loaded, so these
             // settings apply while the scene is showing.
             var skybox = MaterialAsset(name + " sky", "Skybox/Procedural");

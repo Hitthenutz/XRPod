@@ -14,7 +14,9 @@ namespace XRPod.VR.Core
     {
         // The pod asked for an environment, e.g. "forest" chosen in the HUD.
         // The name is passed through as-is; EnvironmentController rejects
-        // unknown names.
+        // unknown names. A link may repeat the pod's current choice (e.g.
+        // every poll) so the headset stays in step with the HUD; repeats
+        // of the environment already showing do nothing.
         event Action<string> EnvironmentRequested;
 
         // Report what the VR user is seeing now. Only the newest state
