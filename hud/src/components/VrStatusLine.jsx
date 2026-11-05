@@ -2,14 +2,15 @@ import { Headset } from "lucide-react";
 import { useVrState } from "@/hooks/useVrState";
 import { timeAgo } from "@/lib/time";
 
-// "windy zone", "no zone", or "zones not tracked".
+// "beach-waterline (cool)", "no zone", or "zones not tracked". The zone id is
+// what auto mode's recipes use (vr/docs/ZONES.md); the type is only a hint.
 function zoneText(vr) {
   if (!vr.zone_tracking) return "zones not tracked";
-  if (vr.zone_type === "neutral") return "no zone";
-  return `${vr.zone_type} zone`;
+  if (!vr.zone_id) return "no zone";
+  return vr.zone_type === "neutral" ? vr.zone_id : `${vr.zone_id} (${vr.zone_type})`;
 }
 
-/** One line showing what the headset last reported, e.g. "VR: forest / windy zone". */
+/** One line showing what the headset last reported, e.g. "VR: beach / beach-waterline (cool)". */
 export function VrStatusLine({ selectedEnvironment }) {
   const { vr, connected } = useVrState();
   // The researcher picked a world but the headset still shows another one.
