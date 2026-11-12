@@ -26,6 +26,7 @@ namespace XRPod.VR
         [SerializeField] bool showOverlay = true;
 
         int _podRequestIndex;
+        HttpPodLink _podLink;
 
         void Awake()
         {
@@ -34,6 +35,8 @@ namespace XRPod.VR
             // HUD shows "VR: not connected". (No effect on the Quest.)
             Application.runInBackground = true;
         }
+
+        void Start() => _podLink = FindAnyObjectByType<HttpPodLink>();
 
         void Update()
         {
@@ -67,7 +70,8 @@ namespace XRPod.VR
 
             var zone = session.Zones.ActiveZone;
             var last = session.LastPublished;
-            GUI.Label(new Rect(10, 10, 800, 80),
+            GUI.Label(new Rect(10, 10, 800, 100),
+                $"Pod: {(_podLink == null ? "offline (no Pod Link)" : $"{_podLink.Status} {_podLink.CurrentUrl}")}\n" +
                 $"Environment: {(session.Environments.Current == EnvironmentId.None ? "waiting room" : session.Environments.Current.ToString())}\n" +
                 $"Zone: {(!session.Zones.ZoneTrackingEnabled ? "tracking off" : zone == null ? "neutral" : zone.ToString())}" +
                 $"   (inside {session.Zones.OccupiedCount})\n" +
