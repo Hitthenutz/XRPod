@@ -5,6 +5,7 @@
 //   4           switch to the sponsor environment (if marked available)
 //   P           pretend the pod asked for the next environment (only
 //               when running offline, with no pod link set)
+//   Z           show or hide the coloured zone pads
 //
 // It also shows the current environment and zone in the top-left corner of
 // the Game view. The overlay isn't visible in the headset.
@@ -52,6 +53,8 @@ namespace XRPod.VR
             if (keyboard.digit4Key.wasPressedThisFrame
                 && session.Environments.Request(EnvironmentId.Sponsor, "keyboard") == EnvironmentRequestResult.Unavailable)
                 Debug.Log("Sponsor environment isn't available yet (VrSystemRoot > Sponsor Available).");
+
+            if (keyboard.zKey.wasPressedThisFrame) ZoneVolume.MarkersVisible = !ZoneVolume.MarkersVisible;
 
             if (keyboard.pKey.wasPressedThisFrame)
             {

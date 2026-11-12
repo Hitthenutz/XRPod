@@ -221,6 +221,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.HttpPodLink
   baseUrl: http://localhost:8080
+  autoFind: 1
+  showStatus: 1
   pollSeconds: 1
   resendSeconds: 5
   timeoutSeconds: 3

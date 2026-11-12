@@ -9,6 +9,12 @@
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
 
+# Asset Store / Fab packs: their licence doesn't allow sharing the files in
+# a public repo. Each teammate imports them from their own account (list
+# them in vr/THIRD_PARTY_NOTICES.md).
+/[Aa]ssets/Beach - resort/
+/[Aa]ssets/Beach - resort.meta
+
 # Asset Store tools and plugin caches
 /[Aa]ssets/AssetStoreTools*
 /[Aa]ssets/Plugins/Editor/JetBrains*

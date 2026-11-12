@@ -153,6 +153,10 @@ namespace XRPod.VR
                 {
                     var probe = UnityWebRequest.Get(candidates[i] + "/api/vr/state");
                     probe.timeout = 2;
+                    // The Pi answers directly. Other devices (e.g. the router)
+                    // often redirect to an https page whose certificate fails,
+                    // which only fills the Console with errors.
+                    probe.redirectLimit = 0;
                     probe.SendWebRequest();
                     batch.Add((candidates[i], probe));
                 }

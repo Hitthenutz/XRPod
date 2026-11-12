@@ -25,6 +25,26 @@ namespace XRPod.VR
         [SerializeField] int priority;
 
         ZoneDefinition _definition;
+        static bool s_markersVisible;
+
+        // The coloured pads ("Marker" children, from the test scene builder)
+        // show where zones are. They're for testing: hidden while playing
+        // unless turned on (key Z, EditorTestControls). Zones work either way.
+        public static bool MarkersVisible
+        {
+            get => s_markersVisible;
+            set
+            {
+                s_markersVisible = value;
+                foreach (var zone in FindObjectsByType<ZoneVolume>()) zone.ApplyMarker();
+            }
+        }
+
+        void ApplyMarker()
+        {
+            var marker = transform.Find("Marker");
+            if (marker != null && marker.TryGetComponent<Renderer>(out var pad)) pad.enabled = s_markersVisible;
+        }
 
         // Runs when the component is first added in the Editor.
         void Reset()
@@ -42,6 +62,7 @@ namespace XRPod.VR
 
         void Awake()
         {
+            ApplyMarker();
             if (string.IsNullOrWhiteSpace(zoneId) || environment == EnvironmentId.None)
             {
                 Debug.LogError($"{name}: ZoneVolume needs a Zone Id and an Environment. Disabled.", this);
