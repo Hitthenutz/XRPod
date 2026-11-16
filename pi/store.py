@@ -53,6 +53,20 @@ DEFAULT_SETTINGS = {
     "selected_environment": "none",
 }
 
+# Fields that drive the hardware. Who may change them depends on the mode:
+# the researcher (HUD, Unity, curl) only in manual, the Pi's own auto control
+# logic only in auto. The mode and environment are not in this list, so the
+# researcher can always switch back to manual and take control.
+HARDWARE_FIELDS = (
+    "target_temp_f",
+    "target_humidity_pct",
+    "fan_speed_pct",
+    "ac_on",
+    "heater_on",
+    "selected_scent",
+    "scent_intensity_pct",
+)
+
 # Keep the database small on the Pi's SD card.
 READING_RETENTION_SECONDS = 24 * 60 * 60
 HISTORY_MAX_ROWS = 5000
@@ -90,11 +104,15 @@ def _validate_value(field, value):
     return value
 
 
-def validate_patch(patch, current):
+def validate_patch(patch, current, by_auto=False):
     """Return a cleaned patch, or raise ValidationError.
 
     Enforces heater/AC mutual exclusion: turning one on turns the other off,
     and asking for both on at once is rejected.
+
+    Enforces the mode lock (KAN-49): in auto mode only the auto control logic
+    (by_auto=True) may change the hardware fields; in manual mode only the
+    researcher may. Only the researcher may change the control mode.
     """
     if not isinstance(patch, dict) or not patch:
         raise ValidationError("body must be a non-empty JSON object")
@@ -110,6 +128,19 @@ def validate_patch(patch, current):
         clean.setdefault("ac_on", False)
     if clean.get("ac_on") and current.get("heater_on"):
         clean.setdefault("heater_on", False)
+
+    if by_auto and "control_mode" in clean:
+        raise ValidationError("only the researcher can change control_mode")
+    mode = clean.get("control_mode", current.get("control_mode", "manual"))
+    changing = sorted(f for f in HARDWARE_FIELDS if f in clean and clean[f] != current.get(f))
+    if changing and mode == "auto" and not by_auto:
+        raise ValidationError(
+            f"pod is in auto mode: switch to manual to change {', '.join(changing)}"
+        )
+    if changing and mode == "manual" and by_auto:
+        raise ValidationError(
+            f"pod is in manual mode: auto control can't change {', '.join(changing)}"
+        )
     return clean
 
 
@@ -183,13 +214,17 @@ class Store:
         with self._lock:
             return dict(self._settings)
 
-    def update_settings(self, patch, changed_by=None):
-        """Validate and save `patch`. Returns (settings, new_history_rows)."""
+    def update_settings(self, patch, changed_by=None, by_auto=False):
+        """Validate and save `patch`. Returns (settings, new_history_rows).
+
+        Pass by_auto=True from the auto control logic; everything else (HUD,
+        Unity, curl) is the researcher. See validate_patch() for the mode lock.
+        """
         if changed_by is not None:
             changed_by = str(changed_by)[:MAX_CHANGED_BY_LENGTH]
         with self._lock:
             current = self._settings
-            clean = validate_patch(patch, current)
+            clean = validate_patch(patch, current, by_auto=by_auto)
             changed = [f for f in SETTINGS_SCHEMA if f in clean and clean[f] != current[f]]
             if not changed:
                 return dict(current), []
