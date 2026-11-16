@@ -20,8 +20,10 @@ Settings (environment variables):
   XRPOD_DB          database file (default xrpod.db next to this script)
   XRPOD_STATIC_DIR  built HUD (default ../hud/dist)
   CONTROL_SECONDS   sensor/control loop interval (default 2)
-  SCENT_HARDWARE    set to "gpio" to drive the scent machine's real pins
-  LOG_LEVEL         e.g. DEBUG
+  SCENT_HARDWARE    set to "mqtt" to talk to the ESP32 scent node
+  MQTT_HOST         MQTT broker (default 127.0.0.1, Mosquitto on this Pi)
+  MQTT_PORT         broker port (default 1883)
+  MQTT_USER, MQTT_PASSWORD   broker login, if it needs one  LOG_LEVEL         e.g. DEBUG
 
 Uses only the Python standard library (plus RPi.GPIO, which Raspberry Pi OS
 ships with, once you drive real pins).

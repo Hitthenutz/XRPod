@@ -2,8 +2,8 @@
 XRPod hardware: sensors and actuators on the Raspberry Pi.
 
 Everything here is a STUB until you fill in the TODO(hardware) parts, so the
-whole system runs on a laptop for testing. scent.py (the scent machine) is
-already wired up; set SCENT_HARDWARE=gpio to drive its real pins.
+whole system runs on a laptop for testing. scent.py talks to the ESP32 scent
+node over MQTT; set SCENT_HARDWARE=mqtt on the Pi to use it.
 
 Safety rules this module enforces no matter what the HUD asks for:
   * the heater and AC never run at the same time,
@@ -77,9 +77,8 @@ def read_sensors():
         "ac_running": state["ac_running"],
         "heater_running": state["heater_running"],
         "fan_rpm": max(0, round(fake_rpm)),
-        "scent_active": scent_machine.active if scent_machine else "none",
+        **(scent_machine.status() if scent_machine else {"scent_active": "none"}),
     }
-
 
 # --------------------------------------------------------------------------
 # Actuators (STUB)
