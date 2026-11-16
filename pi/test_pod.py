@@ -275,6 +275,33 @@ class StoreTests(unittest.TestCase):
             with self.assertRaises(ValidationError, msg=patch):
                 self.store.update_settings(patch)
 
+    def test_auto_mode_blocks_researcher_hardware_changes(self):
+        self.store.update_settings({"control_mode": "auto"})
+        for patch in [{"fan_speed_pct": 50}, {"heater_on": True}, {"selected_scent": "pine"},
+                      {"control_mode": "auto", "target_temp_f": 80}]:
+            with self.assertRaises(ValidationError, msg=patch):
+                self.store.update_settings(patch)
+        self.assertEqual(self.store.get_settings()["fan_speed_pct"], 0)
+        # Resending a value that doesn't change anything is fine.
+        self.store.update_settings({"fan_speed_pct": 0})
+        # The environment can still change in auto.
+        s, _ = self.store.update_settings({"selected_environment": "forest"})
+        self.assertEqual(s["selected_environment"], "forest")
+
+    def test_researcher_can_take_back_control(self):
+        self.store.update_settings({"control_mode": "auto"})
+        s, _ = self.store.update_settings({"control_mode": "manual", "fan_speed_pct": 40})
+        self.assertEqual((s["control_mode"], s["fan_speed_pct"]), ("manual", 40))
+
+    def test_auto_control_only_acts_in_auto(self):
+        with self.assertRaises(ValidationError):
+            self.store.update_settings({"fan_speed_pct": 60}, by_auto=True)
+        self.store.update_settings({"control_mode": "auto"})
+        s, _ = self.store.update_settings({"fan_speed_pct": 60}, by_auto=True)
+        self.assertEqual(s["fan_speed_pct"], 60)
+        with self.assertRaises(ValidationError):
+            self.store.update_settings({"control_mode": "manual"}, by_auto=True)
+
     def test_turning_one_on_turns_the_other_off(self):
         self.store.update_settings({"heater_on": True})
         s, rows = self.store.update_settings({"ac_on": True})
