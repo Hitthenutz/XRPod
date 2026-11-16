@@ -4,7 +4,7 @@
 
 Covers the safety rules (heater/AC exclusion, junk values, scent commands
 and node reports), the MQTT client, settings validation and history, VR
-state reports, and the web server's protections.
+state reports, and the web server's protections."""
 
 import json
 import os
