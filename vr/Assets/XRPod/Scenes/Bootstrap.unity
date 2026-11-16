@@ -166,11 +166,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::XRPod.VR.EnvironmentSceneLoader
   scenes:
   - environment: 1
-    sceneName: Beach
+    sceneName: Beach_v1
   - environment: 2
-    sceneName: Forest
+    sceneName: Forest_v1
   - environment: 3
-    sceneName: Desert
+    sceneName: Desert_v1
   - environment: 4
     sceneName: SponsorComingSoon
   - environment: 0
@@ -353,6 +353,7 @@ MonoBehaviour:
   walkSpeed: 2
   runSpeed: 5
   lookSpeed: 0.15
+  eyeHeight: 1.6
 --- !u!4 &1721161989
 Transform:
   m_ObjectHideFlags: 0

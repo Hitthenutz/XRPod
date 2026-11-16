@@ -21,7 +21,9 @@
 //
 // The worlds are stand-ins for testing switching and zones. Replace the
 // shapes with real art later and keep (or move) the zone objects. Running it
-// again replaces every scene except Bootstrap, after asking.
+// again replaces these test scenes (not Bootstrap), after asking. It never
+// touches the real "v1" worlds (XRPodWorldSetup) or the loader's choice of
+// them.
 
 using System.Collections.Generic;
 using System.IO;
@@ -105,9 +107,13 @@ namespace XRPod.VR
             BuildSponsorComingSoon();
             AssetDatabase.SaveAssets();
 
+            // Our scenes first (Bootstrap must be first), then any others
+            // already in the list, e.g. the hand-made v1 worlds.
             var buildScenes = new List<EditorBuildSettingsScene>();
             foreach (var name in SceneNames)
                 buildScenes.Add(new EditorBuildSettingsScene(ScenePath(name), true));
+            foreach (var other in EditorBuildSettings.scenes)
+                if (!buildScenes.Exists(s => s.path == other.path)) buildScenes.Add(other);
             EditorBuildSettings.scenes = buildScenes.ToArray();
 
             EditorSceneManager.OpenScene(ScenePath("Bootstrap"));
@@ -218,8 +224,7 @@ namespace XRPod.VR
             Dreamy();
 
             var decoration = new GameObject("Decoration").transform;
-            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
-                decoration, "Waiting platform", new Color(0.82f, 0.76f, 0.98f));
+            Platform(decoration, "Waiting platform", new Color(0.82f, 0.76f, 0.98f));
             FloatingShapes(decoration,
                 new Color(1f, 0.72f, 0.82f), new Color(0.72f, 0.85f, 1f),
                 new Color(0.8f, 1f, 0.85f), new Color(1f, 0.93f, 0.7f));
@@ -242,8 +247,7 @@ namespace XRPod.VR
             Dreamy();
 
             var decoration = new GameObject("Decoration").transform;
-            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
-                decoration, "Sponsor platform", new Color(0.62f, 0.86f, 0.86f));
+            Platform(decoration, "Sponsor platform", new Color(0.62f, 0.86f, 0.86f));
             FloatingShapes(decoration,
                 new Color(0.35f, 0.75f, 0.78f), new Color(1f, 0.8f, 0.35f),
                 new Color(0.55f, 0.88f, 0.8f), new Color(1f, 0.9f, 0.6f));
@@ -601,6 +605,16 @@ namespace XRPod.VR
                 var color = Color.Lerp(ZoneColor(zone.Type), Color.black, zone.Priority / 100f);
                 Paint(pad, $"Zone {ZoneTypes.ToWireName(zone.Type)} {zone.Priority}", color, 0.1f);
             }
+        }
+
+        // The round platform the user stands on in the rooms. Only a look:
+        // a flattened cylinder's own collider becomes a 2.5 m ball the user
+        // would stand on top of, and the floor under it already holds them.
+        static void Platform(Transform parent, string material, Color color)
+        {
+            var platform = Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f),
+                new Vector3(5f, 0.02f, 5f), parent, material, color);
+            Object.DestroyImmediate(platform.GetComponent<Collider>());
         }
 
         // Close, soft fog for the rooms: the floor fades into the sky.

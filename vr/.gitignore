@@ -14,6 +14,17 @@
 # them in vr/THIRD_PARTY_NOTICES.md).
 /[Aa]ssets/Beach - resort/
 /[Aa]ssets/Beach - resort.meta
+/[Aa]ssets/Rain Forest SFX/
+/[Aa]ssets/Rain Forest SFX.meta
+/[Aa]ssets/Fantasy Forest Environment Free Sample/
+/[Aa]ssets/Fantasy Forest Environment Free Sample.meta
+/[Aa]ssets/ForestVision/
+/[Aa]ssets/ForestVision.meta
+/[Aa]ssets/EmaceArt - raft on the desert/
+/[Aa]ssets/EmaceArt - raft on the desert.meta
+# Made by Unity from the Fantasy Forest pack's ground textures
+/[Aa]ssets/_TerrainAutoUpgrade/
+/[Aa]ssets/_TerrainAutoUpgrade.meta
 
 # Asset Store tools and plugin caches
 /[Aa]ssets/AssetStoreTools*

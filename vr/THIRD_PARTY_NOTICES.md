@@ -8,6 +8,19 @@ Assets under the Unity Asset Store or Fab licences must **not** be
 committed (keep them in a git-ignored folder; each teammate imports
 them from their own account).
 
+## Store packs (not in git: import them yourself)
+
+| Pack | Used for | Where it goes | Licence |
+|---|---|---|---|
+| [Beach - resort](https://assetstore.unity.com/) by Mixall (free) | `Beach_v1` scenery | `Assets/Beach - resort/` | Standard Unity Asset Store EULA |
+| [Rain Forest SFX](https://assetstore.unity.com/) by Kedfa (free) | Forest rain and bird sounds | `Assets/Rain Forest SFX/` | Standard Unity Asset Store EULA |
+| [Fantasy Forest Environment Free Sample](https://assetstore.unity.com/packages/3d/environments/fantasy/fantasy-forest-environment-free-demo-35361) (free) | `Forest_v1` trees and ground | `Assets/Fantasy Forest Environment Free Sample/` | Standard Unity Asset Store EULA |
+| ForestVision by Bauervision (free) | Trying out for `Forest_v1` | `Assets/ForestVision/` | Standard Unity Asset Store EULA |
+| Raft on the desert - Free Low Poly Pack by EmaceArt (free) | `Desert_v1` scenery | `Assets/EmaceArt - raft on the desert/` | Standard Unity Asset Store EULA |
+
+To see a v1 world, add the pack to your Unity account (free ones too), then
+**Window → Package Manager → My Assets → Download → Import**.
+
 ## In `Assets/XRPod/Environments/`
 
 All from [Poly Haven](https://polyhaven.com), [CC0](https://polyhaven.com/license)

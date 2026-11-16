@@ -103,6 +103,21 @@ namespace XRPod.VR.OfflineTests
                 Equal(1, h.Zones.OccupiedCount, "occupied");
             }),
 
+            new TestCase("zone with one id in several places: in it until you've left them all", () =>
+            {
+                // Shade under every umbrella shares the id beach-umbrella-shade.
+                var h = new Harness(EnvironmentId.Beach);
+                var shadeA = new ZoneDefinition("beach-umbrella-shade", ZoneType.Cool, EnvironmentId.Beach, 15);
+                var shadeB = new ZoneDefinition("beach-umbrella-shade", ZoneType.Cool, EnvironmentId.Beach, 15);
+                h.Zones.Enter(shadeA);
+                h.Zones.Enter(shadeB); // the two umbrellas' shade overlaps
+                Equal(ZoneInputResult.NoChange, h.Zones.Exit("beach-umbrella-shade"), "left the first");
+                Equal("beach-umbrella-shade", h.Zones.ActiveZone?.Id, "still in shade");
+                Equal(ZoneInputResult.Changed, h.Zones.Exit("beach-umbrella-shade"), "left the second");
+                Equal(null, h.Zones.ActiveZone, "out of the shade");
+                Equal(2, h.ZoneEvents.Count, "one enter and one exit event");
+            }),
+
             new TestCase("leaving a zone you're not in is ignored", () =>
             {
                 var h = new Harness();

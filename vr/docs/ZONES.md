@@ -48,6 +48,11 @@ The sea is ahead of the start point (+z).
 | `beach-waterline` | At the waves (inside the shore band) | Cool, very windy, damp, salty | 72 | 75 | 70 | ocean 70 % |
 | `beach-dunes` | Dunes to the right | Breezy and dry | 82 | 50 | 30 | none |
 | `beach-palm-shade` | Under the palm behind the start | Shade, a little cooler | 76 | 20 | 45 | none |
+| `beach-umbrella-shade` | Under any umbrella (one id for all of them) | Shade, a little cooler | 77 | 20 | 45 | none |
+
+In `Beach_v1`, **XRPod → Finish Beach v1** (and **15% Bigger**) puts a
+`beach-umbrella-shade` zone under every umbrella. Shade beats the sunny
+shore (priority 15 vs 10); the waterline's wind and spray beat shade (20).
 
 ### Forest
 
