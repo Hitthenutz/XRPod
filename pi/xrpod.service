@@ -6,8 +6,8 @@
 #   sudo systemctl enable --now xrpod
 #   journalctl -u xrpod -f          # live logs
 #
-# Change User and the /home/pi/XRPod paths if your Pi username or clone
-# location differ.
+# Set up for the pod Pi: user "xrpod", repo cloned to /home/xrpod/XRPod.
+# Change User and the paths if your Pi username or clone location differ.
 
 [Unit]
 Description=XRPod pod controller and HUD
@@ -15,13 +15,14 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-User=pi
-WorkingDirectory=/home/pi/XRPod
-ExecStart=/usr/bin/python3 /home/pi/XRPod/pi/agent.py
+User=xrpod
+WorkingDirectory=/home/xrpod/XRPod
+ExecStart=/usr/bin/python3 /home/xrpod/XRPod/pi/agent.py
 Restart=on-failure
 RestartSec=3
 
-# Serve on port 80 so phones can just open http://xrpod.local
+# Serve on port 80 so phones on the XRPod-Pi hotspot can just open
+# http://10.42.0.1 (.local names don't resolve over the hotspot)
 Environment=HUD_PORT=80
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
