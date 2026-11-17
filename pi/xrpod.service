@@ -26,8 +26,8 @@ RestartSec=3
 Environment=HUD_PORT=80
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
-# Uncomment once the scent machine is wired up:
-# Environment=SCENT_HARDWARE=gpio
+# Talk to the ESP32 scent node through Mosquitto on this Pi:
+Environment=SCENT_HARDWARE=mqtt
 
 [Install]
 WantedBy=multi-user.target

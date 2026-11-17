@@ -2,13 +2,13 @@
 
     python3 -m unittest discover -s pi -v
 
-Covers the safety rules (heater/AC exclusion, junk values, one scent at a
-time), settings validation and history, VR state reports, and the web
-server's protections.
-"""
+Covers the safety rules (heater/AC exclusion, junk values, scent commands
+and node reports), the MQTT client, settings validation and history, VR
+state reports, and the web server's protections."""
 
 import json
 import os
+import socket
 import sys
 import tempfile
 import threading
@@ -19,6 +19,7 @@ import urllib.request
 sys.path.insert(0, os.path.dirname(__file__))
 
 import hardware  # noqa: E402
+import mqtt  # noqa: E402
 import scent  # noqa: E402
 from store import Store, ValidationError  # noqa: E402
 from vr import STALE_SECONDS, VrState  # noqa: E402
@@ -29,23 +30,28 @@ GOOD_VR = {"session_id": "test1", "seq": 2, "environment": "forest",
            "reason": "zone_entered"}
 
 
-class RecordingBackend:
+class FakeLink:
+    """Records what the scent controller publishes."""
+
+    is_stub = False
+
     def __init__(self):
-        self.on, self.duty, self.max_on = set(), None, 0
+        self.sent = []
 
-    def setup(self, *args):
-        pass
-
-    def set_output(self, pin, on):
-        (self.on.add if on else self.on.discard)(pin)
-        self.max_on = max(self.max_on, len(self.on))
-
-    def set_pwm(self, duty):
-        self.duty = duty
+    def publish(self, topic, payload, retain=False):
+        self.sent.append((topic, json.loads(payload)))
+        return True
 
     def close(self):
         pass
 
+
+class FakeClock:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
 
 class HardwareTests(unittest.TestCase):
     def setUp(self):
@@ -82,19 +88,167 @@ class HardwareTests(unittest.TestCase):
 
 
 class ScentTests(unittest.TestCase):
-    def test_one_cartridge_at_a_time(self):
-        rec = RecordingBackend()
-        c = scent.ScentController(rec)
-        c.apply("lavender", 60)
-        self.assertEqual(rec.on, {scent.CARTRIDGE_PINS["lavender"]})
-        self.assertEqual(rec.duty, 60)
-        c.apply("pine", 30)
-        self.assertEqual(rec.on, {scent.CARTRIDGE_PINS["pine"]})
-        for off in [("pine", 0), ("bogus", 80), ("none", 80)]:
-            c.apply(*off)
-            self.assertEqual(rec.on, set(), off)
-        self.assertEqual(rec.max_on, 1)
+    def setUp(self):
+        self.link, self.clock = FakeLink(), FakeClock()
+        self.c = scent.ScentController(self.link, clock=self.clock)
 
+    def last_cmd(self):
+        topic, cmd = self.link.sent[-1]
+        self.assertEqual(topic, scent.TOPIC_CMD)
+        return cmd
+
+    def test_starts_off(self):
+        self.assertEqual(self.link.sent, [(scent.TOPIC_CMD, scent.OFF)])
+
+    def test_commands_match_the_firmware(self):
+        self.c.apply("lavender", 60)
+        self.assertEqual(self.last_cmd(), {"selected_scent": "lavender", "scent_intensity_pct": 60})
+        self.c.apply("pine", 130)
+        self.assertEqual(self.last_cmd(), {"selected_scent": "pine", "scent_intensity_pct": 100})
+
+    def test_junk_means_off(self):
+        for args in [("pine", 0), ("none", 80), ("", 50), (7, 50), (None, 50)]:
+            self.c.apply("lavender", 60)
+            self.c.apply(*args)
+            self.assertEqual(self.last_cmd(), scent.OFF, args)
+            self.assertEqual(self.c.active, "none")
+
+    def test_resends_before_the_node_times_out(self):
+        self.c.apply("pine", 50)
+        sent = len(self.link.sent)
+        self.clock.t += 2
+        self.c.apply("pine", 50)
+        self.assertEqual(len(self.link.sent), sent)  # no spam every loop
+        self.clock.t += scent.CMD_REFRESH_S
+        self.c.apply("pine", 50)
+        self.assertEqual(len(self.link.sent), sent + 1)
+        self.assertLess(scent.CMD_REFRESH_S, 15)  # node's kCommandTimeoutMs
+
+    def test_close_always_sends_off(self):
+        self.c.apply("pine", 50)
+        self.c.off()
+        self.c.close()
+        self.assertEqual(self.last_cmd(), scent.OFF)
+        self.assertEqual(self.link.sent[-2:], [(scent.TOPIC_CMD, scent.OFF)] * 2)
+
+    def test_reports_what_the_node_says(self):
+        self.c.apply("pine", 50)
+        self.assertEqual(self.c.reported_scent(), "none")  # nothing heard yet
+        state = {"selected_scent": "pine", "scent_intensity_pct": 50,
+                 "diffusers": [True, False], "reason": "ok", "uptime_s": 12}
+        self.c.on_message(scent.TOPIC_NODE, b"online")
+        self.c.on_message(scent.TOPIC_STATE, json.dumps(state).encode())
+        self.assertEqual(self.c.reported_scent(), "pine")
+        self.assertEqual(self.c.node_state["diffusers"], [True, False])
+        self.c.on_message(scent.TOPIC_NODE, b"offline")
+        self.assertEqual(self.c.reported_scent(), "none")
+        self.c.on_message(scent.TOPIC_NODE, b"online")
+        self.clock.t += scent.STATE_FRESH_S + 1  # node went quiet
+        self.assertEqual(self.c.reported_scent(), "none")
+
+    def test_ignores_bad_messages(self):
+        for payload in [b"not json", b"[]", b'{"selected_scent": 5}',
+                        b'{"selected_scent": "pine", "scent_intensity_pct": true}',
+                        b'{"selected_scent": "pine", "scent_intensity_pct": 900}', b"\xff"]:
+            self.c.on_message(scent.TOPIC_STATE, payload)
+            self.c.on_message(scent.TOPIC_READING, payload)
+        self.assertIsNone(self.c.node_state)
+        self.assertIsNone(self.c.reading)
+        self.c.on_message(scent.TOPIC_ERROR, b'{"error": "unknown_scent"}')
+        self.assertEqual(self.c.last_error, "unknown_scent")
+        self.c.on_message(scent.TOPIC_ERROR, b"junk")
+        self.assertEqual(self.c.last_error, "unreadable error message")
+
+    def test_status_includes_iaq_reading(self):
+        reading = {"temp_c": 22.5, "humidity_pct": 40.1, "pressure_hpa": 1012.0,
+                   "gas_kohm": 80.2, "gas_baseline_kohm": 100.0, "baseline_ready": True,
+                   "scent_active": "pine", "scent_detected": True}
+        self.c.on_message(scent.TOPIC_READING, json.dumps(reading).encode())
+        status = self.c.status()
+        self.assertTrue(status["scent_detected"])
+        self.assertEqual(status["iaq"]["temp_c"], 22.5)
+        self.clock.t += scent.READING_FRESH_S + 1
+        self.assertIsNone(self.c.status()["iaq"])
+        self.assertFalse(self.c.status()["scent_detected"])
+
+    def test_stub_link_reports_the_command(self):
+        c = scent.ScentController(scent.StubLink())
+        c.apply("pine", 40)
+        self.assertEqual(c.status()["scent_active"], "pine")
+        self.assertEqual(c.status()["scent_node"], "stub")
+
+class MqttTests(unittest.TestCase):
+    def test_packet_round_trip(self):
+        for n in (0, 127, 128, 16383, 16384, 2_097_151):
+            self.assertEqual(len(mqtt.encode_length(n)), 1 if n < 128 else 2 if n < 16384 else 3)
+        buf = bytearray(mqtt.publish_packet("xrpod/scent/cmd", '{"a":1}', retain=True))
+        ptype, flags, body = mqtt.parse_packet(buf)
+        self.assertEqual((ptype, flags), (mqtt.PUBLISH, 1))
+        self.assertEqual(mqtt.parse_publish(flags, body)[:2], ("xrpod/scent/cmd", b'{"a":1}'))
+        self.assertEqual(buf, bytearray())
+
+    def test_partial_and_oversized_packets(self):
+        whole = mqtt.publish_packet("t", "x" * 300)
+        buf = bytearray(whole[:-1])
+        self.assertIsNone(mqtt.parse_packet(buf))
+        buf += whole[-1:]
+        self.assertIsNotNone(mqtt.parse_packet(buf))
+        with self.assertRaises(mqtt.ProtocolError):
+            mqtt.parse_packet(bytearray(b"\x30" + mqtt.encode_length(mqtt.MAX_PACKET + 1)))
+        with self.assertRaises(mqtt.ProtocolError):
+            mqtt.parse_packet(bytearray(b"\x30\xff\xff\xff\xff\x01"))
+
+    def test_talks_to_a_broker(self):
+        """Connect, subscribe, receive and publish against a tiny fake broker."""
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        server.settimeout(5)
+        got = {}
+
+        def broker():
+            conn, _ = server.accept()
+            conn.settimeout(5)
+            buf = bytearray()
+
+            def read():
+                while True:
+                    pkt = mqtt.parse_packet(buf)
+                    if pkt:
+                        return pkt
+                    buf.extend(conn.recv(4096))
+
+            got["connect"] = read()
+            conn.sendall(bytes([0x20, 2, 0, 0]))  # CONNACK ok
+            got["subscribe"] = read()
+            conn.sendall(bytes([0x90, 3, 0, 1, 0]))  # SUBACK
+            conn.sendall(mqtt.publish_packet(scent.TOPIC_NODE, "online"))
+            got["publish"] = read()
+            conn.close()
+
+        thread = threading.Thread(target=broker)
+        thread.start()
+        received = []
+        client = mqtt.MqttClient("127.0.0.1", server.getsockname()[1], client_id="test",
+                                 subscriptions=[scent.TOPIC_NODE],
+                                 on_message=lambda t, p: received.append((t, p)))
+        client.start()
+        for _ in range(100):
+            if received:
+                break
+            threading.Event().wait(0.05)
+        self.assertTrue(client.publish(scent.TOPIC_CMD, json.dumps(scent.OFF)))
+        thread.join(timeout=5)
+        client.close()
+        server.close()
+
+        self.assertEqual(received, [(scent.TOPIC_NODE, b"online")])
+        self.assertEqual(got["connect"][0], mqtt.CONNECT)
+        self.assertIn(b"MQTT", got["connect"][2])
+        self.assertEqual(got["subscribe"][:2], (mqtt.SUBSCRIBE, 2))
+        self.assertIn(scent.TOPIC_NODE.encode(), got["subscribe"][2])
+        topic, payload, _, _ = mqtt.parse_publish(got["publish"][1], got["publish"][2])
+        self.assertEqual((topic, json.loads(payload)), (scent.TOPIC_CMD, scent.OFF))
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
@@ -120,6 +274,33 @@ class StoreTests(unittest.TestCase):
                       {"selected_environment": "moon"}, {"selected_environment": None}]:
             with self.assertRaises(ValidationError, msg=patch):
                 self.store.update_settings(patch)
+
+    def test_auto_mode_blocks_researcher_hardware_changes(self):
+        self.store.update_settings({"control_mode": "auto"})
+        for patch in [{"fan_speed_pct": 50}, {"heater_on": True}, {"selected_scent": "pine"},
+                      {"control_mode": "auto", "target_temp_f": 80}]:
+            with self.assertRaises(ValidationError, msg=patch):
+                self.store.update_settings(patch)
+        self.assertEqual(self.store.get_settings()["fan_speed_pct"], 0)
+        # Resending a value that doesn't change anything is fine.
+        self.store.update_settings({"fan_speed_pct": 0})
+        # The environment can still change in auto.
+        s, _ = self.store.update_settings({"selected_environment": "forest"})
+        self.assertEqual(s["selected_environment"], "forest")
+
+    def test_researcher_can_take_back_control(self):
+        self.store.update_settings({"control_mode": "auto"})
+        s, _ = self.store.update_settings({"control_mode": "manual", "fan_speed_pct": 40})
+        self.assertEqual((s["control_mode"], s["fan_speed_pct"]), ("manual", 40))
+
+    def test_auto_control_only_acts_in_auto(self):
+        with self.assertRaises(ValidationError):
+            self.store.update_settings({"fan_speed_pct": 60}, by_auto=True)
+        self.store.update_settings({"control_mode": "auto"})
+        s, _ = self.store.update_settings({"fan_speed_pct": 60}, by_auto=True)
+        self.assertEqual(s["fan_speed_pct"], 60)
+        with self.assertRaises(ValidationError):
+            self.store.update_settings({"control_mode": "manual"}, by_auto=True)
 
     def test_turning_one_on_turns_the_other_off(self):
         self.store.update_settings({"heater_on": True})
