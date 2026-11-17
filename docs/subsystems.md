@@ -9,6 +9,7 @@ its own branch and pull request. Shared files (`README.md`, `CLAUDE.md`,
 | `hud/` | Centralized HUD (web app) | Zainab | Browser, served by the Pi |
 | `pi/` | Central controller: API, storage, control loop, safety | Team | Raspberry Pi 5 |
 | `pi/` → `hardware.py` | Temperature, humidity, airflow (fans, heater, AC) | Genesis | Raspberry Pi 5 |
+| `esp32/fan-node/` | Fan speed + RPM (HTTP, see its README) | Genesis | ESP32-S3 |
 | `esp32/scent-node/` | Scent + indoor air quality (BME688) | Matt | ESP32 WROOM-32 |
 | `vr/` | VR app (Unity 6.6): environments, zone detection, reports to the Pi | Maryam | Meta Quest 3 |
 | (planned) | Data logging, VR-independent operation | Maryam | Pi |
