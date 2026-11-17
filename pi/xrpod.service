@@ -29,5 +29,9 @@ AmbientCapabilities=CAP_NET_BIND_SERVICE
 # Talk to the ESP32 scent node through Mosquitto on this Pi:
 Environment=SCENT_HARDWARE=mqtt
 
+# Fans are driven by the ESP32 in esp32/fan-node (same Wi-Fi as the Pi).
+# Uncomment once it's running; use its IP if .local names don't resolve:
+# Environment=FAN_ESP32_URL=http://xrpod-fan.local
+
 [Install]
 WantedBy=multi-user.target
