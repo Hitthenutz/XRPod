@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unity.h>
 
+#include <BenchCommand.h>
 #include <CommandParser.h>
 #include <Messages.h>
 #include <ScentController.h>
@@ -306,6 +307,59 @@ void test_reading_json_and_overflow() {
   TEST_ASSERT_EQUAL_UINT(0, buildReadingJson(r, d, "none", tiny, sizeof(tiny)));
 }
 
+// ---- bench console parsing ----------------------------------------------------
+static BenchCommand bench(const char *line) { return parseBenchLine(line, kSlots, 3, 2); }
+
+void test_bench_simple_commands() {
+  TEST_ASSERT_EQUAL(BenchAction::None, bench("").action);
+  TEST_ASSERT_EQUAL(BenchAction::None, bench("   \r\n").action);
+  TEST_ASSERT_EQUAL(BenchAction::None, bench(nullptr).action);
+  TEST_ASSERT_EQUAL(BenchAction::Help, bench("help").action);
+  TEST_ASSERT_EQUAL(BenchAction::Help, bench("?").action);
+  TEST_ASSERT_EQUAL(BenchAction::Status, bench("  STATUS ").action);
+  TEST_ASSERT_EQUAL(BenchAction::Off, bench("off").action);
+  TEST_ASSERT_EQUAL(BenchAction::Off, bench("stop").action);
+  TEST_ASSERT_EQUAL(BenchAction::Sensor, bench("sensor").action);
+  TEST_ASSERT_EQUAL(BenchAction::Net, bench("NET").action);
+  TEST_ASSERT_EQUAL(BenchAction::Scan, bench("scan").action);
+  TEST_ASSERT_EQUAL(BenchAction::Unknown, bench("dance").action);
+}
+
+void test_bench_scent() {
+  BenchCommand c = bench("scent Pine 60");
+  TEST_ASSERT_EQUAL(BenchAction::Scent, c.action);
+  TEST_ASSERT_EQUAL_INT8(1, c.slot);
+  TEST_ASSERT_EQUAL_UINT8(60, c.pct);
+  TEST_ASSERT_EQUAL(BenchAction::Off, bench("scent pine 0").action);
+  TEST_ASSERT_EQUAL(BenchAction::Off, bench("scent none 50").action);
+  const char *bad[] = {"scent", "scent pine", "scent pine 101", "scent pine -1",
+                       "scent pine 6o", "scent ocean 50", "scent pine 50 extra",
+                       "scent pine 50 a b"};
+  for (const char *b : bad) TEST_ASSERT_EQUAL_MESSAGE(BenchAction::BadArgs, bench(b).action, b);
+}
+
+void test_bench_pin_and_log() {
+  BenchCommand c = bench("pin citrus 2");
+  TEST_ASSERT_EQUAL(BenchAction::Pin, c.action);
+  TEST_ASSERT_EQUAL_INT8(2, c.slot);
+  TEST_ASSERT_EQUAL_UINT8(1, c.diffuser);
+  TEST_ASSERT_EQUAL(BenchAction::BadArgs, bench("pin citrus 0").action);
+  TEST_ASSERT_EQUAL(BenchAction::BadArgs, bench("pin citrus 3").action);
+  TEST_ASSERT_EQUAL(BenchAction::BadArgs, bench("pin rose 1").action);
+  BenchCommand on = bench("log on");
+  TEST_ASSERT_EQUAL(BenchAction::Log, on.action);
+  TEST_ASSERT_TRUE(on.flag);
+  TEST_ASSERT_FALSE(bench("LOG OFF").flag);
+  TEST_ASSERT_EQUAL(BenchAction::BadArgs, bench("log maybe").action);
+}
+
+void test_bench_long_line_is_truncated_safely() {
+  char longLine[200];
+  memset(longLine, 'a', sizeof(longLine) - 1);
+  longLine[sizeof(longLine) - 1] = '\0';
+  TEST_ASSERT_EQUAL(BenchAction::Unknown, bench(longLine).action);
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(test_clamp_pct);
@@ -330,5 +384,9 @@ int main() {
   RUN_TEST(test_detector_ignores_lingering_scent_and_bad_reads);
   RUN_TEST(test_state_json);
   RUN_TEST(test_reading_json_and_overflow);
+  RUN_TEST(test_bench_simple_commands);
+  RUN_TEST(test_bench_scent);
+  RUN_TEST(test_bench_pin_and_log);
+  RUN_TEST(test_bench_long_line_is_truncated_safely);
   return UNITY_END();
 }

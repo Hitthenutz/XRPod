@@ -16,7 +16,7 @@ Pi (Mosquitto) --xrpod/scent/cmd---------------> ESP32 --> 6 MOSFETs --> diffuse
 ## Layout
 
 ```
-platformio.ini            # esp32dev (default) + native (PC unit tests)
+platformio.ini            # esp32dev (default), esp32dev-debug (JTAG), native (PC tests)
 include/
 ├── config.h              # pins, timing, topics  <- edit for your wiring
 └── secrets.example.h     # copy to secrets.h (git-ignored) with Wi-Fi + broker
@@ -25,9 +25,11 @@ lib/scent_core/src/       # pure C++ logic, no Arduino - unit tested
 ├── CommandParser.*       # JSON command -> ScentCommand (never trusts input)
 ├── ScentController.*     # one scent at a time, duty-cycle intensity, timeouts
 ├── ScentDetector.*       # gas-resistance drop vs. clean-air baseline
-└── Messages.*            # state / reading JSON
+├── Messages.*            # state / reading JSON
+└── BenchCommand.*        # bench console command parsing
 src/
 ├── main.cpp              # wires hardware + network to scent_core
+├── debug/BenchConsole.*  # USB serial test commands
 ├── hw/GpioOutputPort.h   # MOSFET outputs
 ├── hw/IaqSensor.*        # BME688, non-blocking reads
 └── net/MqttLink.*        # Wi-Fi + MQTT with retry and last-will
@@ -68,11 +70,42 @@ resistance drops 25 % below its clean-air baseline for 2 readings in a row.
 The sensor needs a few minutes to warm up (`baseline_ready`), and humidity
 affects it too. Upgrade to Bosch BSEC2 for proper IAQ / bVOC values later.
 
-## Build, upload, test
+## Test and debug
 
-- VS Code bottom bar: check mark = Build, arrow = Upload, plug = Serial Monitor.
-  If upload sits on "Connecting...", hold the board's BOOT button.
-- Unit tests on a PC: `pio test -e native` (needs MinGW-w64 g++ on Windows).
+Three levels, fastest first:
+
+1. **Unit tests on your PC** (no board): `pio test -e native` runs the
+   logic in `lib/scent_core`. Needs MinGW-w64 g++ on Windows.
+2. **Bench console over USB** (board, no Pi needed): Upload, open the Serial
+   Monitor (plug icon), and type:
+
+   ```
+   help                  list commands
+   status                scent, diffusers, Wi-Fi/MQTT, sensor, free memory
+   net                   Wi-Fi, broker address, why MQTT isn't connecting
+   scan                  Wi-Fi networks the ESP32 can see (2.4 GHz only)
+   scent lavender 60     run a scent (held until "off"; a Pi command overrides)
+   off                   everything off
+   pin pine 2            pulse one diffuser for 3 s - checks each MOSFET/wire
+   sensor                latest BME688 reading
+   log off               stop printing every reading
+   ```
+
+   Bench commands still go through `ScentController`, so the safety rules
+   apply. Crashes print a decoded backtrace (file and line) thanks to the
+   `esp32_exception_decoder` monitor filter.
+3. **Step-through debugging** (like STM32CubeIDE): the WROOM-32 DevKit has no
+   built-in debugger, so you need an **ESP-Prog** (or another FT2232H JTAG
+   probe). Wire it to GPIO12 (TDI), 13 (TCK), 14 (TMS), 15 (TDO), GND, and
+   3.3 V sense; this firmware keeps those pins free. Pick `esp32dev-debug` in
+   the bottom bar's environment selector, set breakpoints, and press F5.
+
+Build / upload buttons in the VS Code bottom bar: check mark = Build,
+arrow = Upload (hold BOOT if it sits on "Connecting..."), plug = Serial Monitor.
+
+## Wiring
+
+Pin map, MOSFET wiring, power and reserved pins: [docs/PINOUT.md](docs/PINOUT.md).
 
 ## Wiring TODOs
 
