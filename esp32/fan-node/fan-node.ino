@@ -17,10 +17,12 @@
 #include <ArduinoJson.h>
 
 // ---- Fill these in before uploading, and never commit them ----------------
-const char* WIFI_NAME = "PUT_WIFI_NAME_HERE";       // the Pi's hotspot, e.g. XRPod-Pi
+const char* WIFI_NAME = "PUT_WIFI_NAME_HERE";       // the Pi's hotspot, XRPod-Pi (case-sensitive)
 const char* WIFI_PASSWORD = "PUT_WIFI_PASSWORD_HERE";
 const char* MQTT_HOST = "10.42.0.1";                // the Pi (hotspot address)
 const int MQTT_PORT = 1883;
+const char* MQTT_USER = "PUT_MQTT_USER_HERE";          // broker login (same broker as the scent node)
+const char* MQTT_PASSWORD = "PUT_MQTT_PASSWORD_HERE";
 
 // ---- Pins and timing --------------------------------------------------------
 const int FAN_PIN = 4;   // fan pin 4 (PWM)
@@ -117,7 +119,7 @@ void keepConnected() {
     if ((long)(now - nextMqttMs) >= 0) {
       nextMqttMs = now + MQTT_RETRY_MS;
       Serial.printf("[mqtt] connecting to %s:%d ... ", MQTT_HOST, MQTT_PORT);
-      if (mqtt.connect(clientId, nullptr, nullptr, TOPIC_NODE, 1, true, "offline")) {
+      if (mqtt.connect(clientId, MQTT_USER, MQTT_PASSWORD, TOPIC_NODE, 1, true, "offline")) {
         Serial.println("ok");
         mqtt.subscribe(TOPIC_CMD, 1);
         mqtt.publish(TOPIC_NODE, "online", true);

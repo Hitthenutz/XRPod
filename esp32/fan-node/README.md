@@ -18,7 +18,7 @@ Pi <-----------xrpod/fan/error {"error":"bad_json"}
   (GND) to the 12 V supply's minus AND an ESP32 GND, fan pin 2 to 12 V plus.
   12 V never touches the ESP32.
 - Put the Wi-Fi name and password (the Pi's hotspot) at the top of
-  `fan-node.ino` before uploading. Don't commit them. `MQTT_HOST` is the Pi,
+  `fan-node.ino` before uploading, plus the broker login (`MQTT_USER` / `MQTT_PASSWORD`). Don't commit them. `MQTT_HOST` is the Pi,
   `10.42.0.1` on its hotspot.
 - Fail-safe: no command from the Pi for 15 s turns the fans off. The Pi
   resends every 5 s, so this only happens when the Pi or the network is gone.
