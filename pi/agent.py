@@ -36,6 +36,7 @@ from pathlib import Path
 
 import hardware
 from ai_controller import AIController
+from ml_inference import PhysicalEnvironmentModel
 from store import Store
 from vr import VrState
 from web import EventHub, start_server
@@ -49,7 +50,7 @@ CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "2"))
 
 log = logging.getLogger("xrpod")
 
-def control_loop(store, hub, wake, stop, vr, ai_controller):
+def control_loop(store, hub, wake, stop, vr, ai_controller, ml_model):
     """
     Read sensors, generate AI recommendations,
     publish live updates, and preserve existing
@@ -65,6 +66,10 @@ def control_loop(store, hub, wake, stop, vr, ai_controller):
 
             # 2. Read simulated sensor data
             reading = hardware.read_sensors()
+            # Predict physical environmental conditions.
+            # This is monitoring-only; it does not control hardware.
+            physical_prediction = ml_model.predict(reading)
+            
 
             # 3. Get latest VR environment information
             vr_state = vr.latest()
@@ -88,7 +93,9 @@ def control_loop(store, hub, wake, stop, vr, ai_controller):
                 "target_temp_f": recommendation.target_temp_f,
                 "fan_speed_pct": recommendation.fan_speed_pct,
                 "reason": recommendation.reason,
-                "control_mode": settings["control_mode"]
+                "control_mode": settings["control_mode"],
+                "physical_environment": physical_prediction["prediction"],
+                "model_confidence": physical_prediction["confidence"],
             }
 
             hub.publish("ai", ai_status)
@@ -120,8 +127,9 @@ def main():
     hardware.setup()
     # Initialize the XRPOD AI supervisor
     ai_controller = AIController()
+    ml_model = PhysicalEnvironmentModel()
     server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
-    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr, ai_controller), name="control")
+    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr, ai_controller, ml_model), name="control")
     loop.start()
 
     try:
