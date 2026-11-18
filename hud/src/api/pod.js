@@ -39,7 +39,7 @@ let source = null;
 
 function connect() {
   source = new EventSource("/api/events");
-  for (const type of ["settings", "reading", "history", "vr"]) {
+  for (const type of ["settings", "reading", "history", "vr", "ai"]) {
     source.addEventListener(type, (e) => {
       const data = JSON.parse(e.data);
       for (const l of listeners) l[type]?.(data);
