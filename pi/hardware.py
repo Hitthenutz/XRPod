@@ -2,8 +2,9 @@
 XRPod hardware: sensors and actuators on the Raspberry Pi.
 
 Everything here is a STUB until you fill in the TODO(hardware) parts, so the
-whole system runs on a laptop for testing. scent.py talks to the ESP32 scent
-node over MQTT; set SCENT_HARDWARE=mqtt on the Pi to use it.
+whole system runs on a laptop for testing. scent.py and fan.py talk to the
+ESP32 scent and fan nodes over MQTT; set SCENT_HARDWARE=mqtt and
+FAN_HARDWARE=mqtt on the Pi to use them.
 
 Safety rules this module enforces no matter what the HUD asks for:
   * the heater and AC never run at the same time,
@@ -11,14 +12,10 @@ Safety rules this module enforces no matter what the HUD asks for:
   * cleanup() turns every output off.
 """
 
-import json
 import logging
-import os
 import random
-import urllib.error
-import urllib.parse
-import urllib.request
 
+from fan import FanController
 from scent import ScentController
 
 log = logging.getLogger("xrpod.hardware")
@@ -31,28 +28,7 @@ state = {
 }
 scent_machine = None  # ScentController, created in setup()
 
-# Fans are driven by an ESP32 on the same Wi-Fi (sketch: /fan?pct=NN and
-# /status, both return {"fan_pct": .., "fan_rpm": ..}). Set FAN_ESP32_URL,
-# e.g. http://xrpod-fan.local, to use it; leave it unset to stub the fan.
-FAN_ESP32_URL = os.environ.get("FAN_ESP32_URL", "").rstrip("/")
-FAN_ESP32_TIMEOUT_S = 1.5
-_fan_sent_pct = None  # last pct the ESP32 confirmed; None forces a resend
-_fan_rpm = 0
-
-
-def _fan_request(path):
-    """GET a path on the fan ESP32 and return its JSON, or None on failure."""
-    global _fan_rpm
-    try:
-        with urllib.request.urlopen(FAN_ESP32_URL + path, timeout=FAN_ESP32_TIMEOUT_S) as resp:  # noqa: S310 - URL from our own env var
-            data = json.loads(resp.read().decode())
-    except (urllib.error.URLError, OSError, ValueError) as exc:
-        log.warning("fan ESP32 at %s not reachable: %s", FAN_ESP32_URL, exc)
-        return None
-    rpm = data.get("fan_rpm")
-    if isinstance(rpm, (int, float)) and not isinstance(rpm, bool):
-        _fan_rpm = max(0, int(rpm))
-    return data
+fan_node = None  # FanController, created in setup()
 
 
 def setup():
@@ -67,13 +43,10 @@ def setup():
         fan_pwm = GPIO.PWM(FAN_PWM_PIN, 25_000); fan_pwm.start(0)
         dht = adafruit_dht.DHT22(board.D4)
     """
-    global scent_machine
+    global scent_machine, fan_node
     log.info("hardware: using STUBS for heater/AC/sensors")
-    if FAN_ESP32_URL:
-        log.info("hardware: fan via ESP32 at %s", FAN_ESP32_URL)
-    else:
-        log.info("hardware: fan is a STUB (set FAN_ESP32_URL to use the ESP32)")
     scent_machine = ScentController()
+    fan_node = FanController()
 
 
 def cleanup():
@@ -83,7 +56,9 @@ def cleanup():
     """
     set_heater_relay(False)
     set_ac_relay(False)
-    set_fan_pwm(0)
+    state["fan_pct"] = 0
+    if fan_node:
+        fan_node.close()
     if scent_machine:
         scent_machine.close()
     log.info("hardware: all outputs off")
@@ -101,17 +76,14 @@ def read_sensors():
     """
     fake_temp_f = 70.0 + random.uniform(-1.5, 1.5)  # noqa: S311 - stub data
     fake_humidity = 45.0 + random.uniform(-3, 3)  # noqa: S311
-    if FAN_ESP32_URL:
-        fake_rpm = _fan_rpm  # refreshed by every /fan or /status request
-    else:
-        fake_rpm = state["fan_pct"] * 30 + random.uniform(-20, 20) if state["fan_pct"] else 0  # noqa: S311
+    fake_rpm = state["fan_pct"] * 30 + random.uniform(-20, 20) if state["fan_pct"] else 0  # noqa: S311
 
     return {
         "actual_temp_f": round(fake_temp_f, 1),
         "actual_humidity_pct": round(fake_humidity, 1),
         "ac_running": state["ac_running"],
         "heater_running": state["heater_running"],
-        "fan_rpm": max(0, round(fake_rpm)),
+        **(fan_node.status(max(0, round(fake_rpm))) if fan_node else {"fan_rpm": 0}),
         **(scent_machine.status() if scent_machine else {"scent_active": "none"}),
     }
 
@@ -129,20 +101,10 @@ def set_ac_relay(on):
 
 
 def set_fan_pwm(pct):
-    """Send the fan speed to the ESP32. apply_settings() calls this every
-    loop, so a speed is only sent when it changed or the last send failed;
-    otherwise a cheap /status call keeps the RPM reading fresh."""
-    global _fan_sent_pct
+    """Send the fan speed to the fan node (fan.py resends it every few
+    seconds so the node doesn't time out and turn the fans off)."""
     state["fan_pct"] = pct
-    if not FAN_ESP32_URL:
-        return
-    if pct != _fan_sent_pct:
-        data = _fan_request("/fan?" + urllib.parse.urlencode({"pct": pct}))
-        _fan_sent_pct = pct if data is not None else None
-    else:
-        data = _fan_request("/status")
-        if data is not None and data.get("fan_pct") != pct:
-            _fan_sent_pct = None  # ESP32 rebooted or drifted: resend next loop
+    fan_node.set_speed(pct)
 
 
 def to_pct(value):

@@ -9,7 +9,7 @@ its own branch and pull request. Shared files (`README.md`, `CLAUDE.md`,
 | `hud/` | Centralized HUD (web app) | Zainab | Browser, served by the Pi |
 | `pi/` | Central controller: API, storage, control loop, safety | Team | Raspberry Pi 5 |
 | `pi/` → `hardware.py` | Temperature, humidity, airflow (fans, heater, AC) | Genesis | Raspberry Pi 5 |
-| `esp32/fan-node/` | Fan speed + RPM (HTTP, see its README) | Genesis | ESP32-S3 |
+| `esp32/fan-node/` | Fans: speed + RPM | Genesis | ESP32-S3 |
 | `esp32/scent-node/` | Scent + indoor air quality (BME688) | Matt | ESP32 WROOM-32 |
 | `vr/` | VR app (Unity 6.6): environments, zone detection, reports to the Pi | Maryam | Meta Quest 3 |
 | (planned) | Data logging, VR-independent operation | Maryam | Pi |
@@ -49,6 +49,10 @@ The headset only reports. In auto mode the Pi applies a recipe per
 | `xrpod/scent/state` | node → Pi (retained) | `{"selected_scent","scent_intensity_pct","diffusers":[..],"reason","uptime_s"}` |
 | `xrpod/scent/node` | node → Pi (retained, last will) | `online` / `offline` |
 | `xrpod/scent/error` | node → Pi | `{"error":"bad_json"}` etc. |
+| `xrpod/fan/cmd` | Pi → node | `{"fan_speed_pct":60}`; resend at least every 15 s |
+| `xrpod/fan/state` | node → Pi (retained) | `{"fan_speed_pct","fan_rpm","uptime_s"}` |
+| `xrpod/fan/node` | node → Pi (retained, last will) | `online` / `offline` |
+| `xrpod/fan/error` | node → Pi | `{"error":"bad_json"}` etc. |
 | `xrpod/iaq/reading` | node → Pi | `{"temp_c","humidity_pct","pressure_hpa","gas_kohm","gas_baseline_kohm","baseline_ready","scent_active","scent_detected"}` |
 
 Pattern for new nodes: `xrpod/<subsystem>/cmd`, `/state`, `/node`, `/error`.

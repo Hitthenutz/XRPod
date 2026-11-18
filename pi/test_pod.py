@@ -2,8 +2,8 @@
 
     python3 -m unittest discover -s pi -v
 
-Covers the safety rules (heater/AC exclusion, junk values, scent commands
-and node reports), the MQTT client, settings validation and history, VR
+Covers the safety rules (heater/AC exclusion, junk values, scent and fan
+commands and node reports), the MQTT client, settings validation and history, VR
 state reports, and the web server's protections."""
 
 import json
@@ -18,6 +18,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+import fan  # noqa: E402
 import hardware  # noqa: E402
 import mqtt  # noqa: E402
 import scent  # noqa: E402
@@ -84,6 +85,7 @@ class HardwareTests(unittest.TestCase):
         hardware.cleanup()
         self.assertFalse(hardware.state["heater_running"])
         self.assertEqual(hardware.state["fan_pct"], 0)
+        self.assertEqual(hardware.fan_node.speed, 0)
         self.assertEqual(hardware.scent_machine.active, "none")
 
 
@@ -176,6 +178,74 @@ class ScentTests(unittest.TestCase):
         c.apply("pine", 40)
         self.assertEqual(c.status()["scent_active"], "pine")
         self.assertEqual(c.status()["scent_node"], "stub")
+
+
+class FanTests(unittest.TestCase):
+    def setUp(self):
+        self.link, self.clock = FakeLink(), FakeClock()
+        self.c = fan.FanController(self.link, clock=self.clock)
+
+    def last_cmd(self):
+        topic, cmd = self.link.sent[-1]
+        self.assertEqual(topic, fan.TOPIC_CMD)
+        return cmd
+
+    def test_starts_off(self):
+        self.assertEqual(self.link.sent, [(fan.TOPIC_CMD, {"fan_speed_pct": 0})])
+
+    def test_commands_match_the_firmware(self):
+        self.c.set_speed(60)
+        self.assertEqual(self.last_cmd(), {"fan_speed_pct": 60})
+        self.c.set_speed(130)
+        self.assertEqual(self.last_cmd(), {"fan_speed_pct": 100})
+        self.c.set_speed(-5)
+        self.assertEqual(self.last_cmd(), {"fan_speed_pct": 0})
+
+    def test_resends_before_the_node_times_out(self):
+        self.c.set_speed(50)
+        sent = len(self.link.sent)
+        self.clock.t += 2
+        self.c.set_speed(50)
+        self.assertEqual(len(self.link.sent), sent)  # no spam every loop
+        self.clock.t += fan.CMD_REFRESH_S
+        self.c.set_speed(50)
+        self.assertEqual(len(self.link.sent), sent + 1)
+        self.assertLess(fan.CMD_REFRESH_S, 15)  # node's COMMAND_TIMEOUT_MS
+
+    def test_close_always_sends_off(self):
+        self.c.set_speed(0)
+        self.c.close()
+        self.assertEqual(self.link.sent[-2:], [(fan.TOPIC_CMD, {"fan_speed_pct": 0})] * 2)
+
+    def test_reports_what_the_node_says(self):
+        self.c.set_speed(80)
+        self.assertEqual(self.c.status()["fan_rpm"], 0)  # nothing heard yet
+        state = {"fan_speed_pct": 80, "fan_rpm": 1680, "uptime_s": 12}
+        self.c.on_message(fan.TOPIC_NODE, b"online")
+        self.c.on_message(fan.TOPIC_STATE, json.dumps(state).encode())
+        self.assertEqual(self.c.status(), {"fan_rpm": 1680, "fan_node": "online"})
+        self.c.on_message(fan.TOPIC_NODE, b"offline")
+        self.assertEqual(self.c.status()["fan_rpm"], 0)
+        self.c.on_message(fan.TOPIC_NODE, b"online")
+        self.clock.t += fan.STATE_FRESH_S + 1  # node went quiet
+        self.assertEqual(self.c.status()["fan_rpm"], 0)
+
+    def test_ignores_bad_messages(self):
+        for payload in [b"not json", b"[]", b'{"fan_speed_pct": "50", "fan_rpm": 1}',
+                        b'{"fan_speed_pct": true, "fan_rpm": 1}', b'{"fan_speed_pct": 50}',
+                        b'{"fan_speed_pct": 50, "fan_rpm": 751470}', b"\xff"]:
+            self.c.on_message(fan.TOPIC_STATE, payload)
+        self.assertIsNone(self.c.node_state)
+        self.c.on_message(fan.TOPIC_ERROR, b'{"error": "bad_json"}')
+        self.assertEqual(self.c.last_error, "bad_json")
+        self.c.on_message(fan.TOPIC_ERROR, b"junk")
+        self.assertEqual(self.c.last_error, "unreadable error message")
+
+    def test_stub_link_reports_fake_rpm(self):
+        c = fan.FanController(fan.StubLink())
+        c.set_speed(40)
+        self.assertEqual(c.status(1200), {"fan_rpm": 1200, "fan_node": "stub"})
+
 
 class MqttTests(unittest.TestCase):
     def test_packet_round_trip(self):
