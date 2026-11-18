@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 
 import hardware
+from ai_controller import AIController
 from store import Store
 from vr import VrState
 from web import EventHub, start_server
@@ -48,18 +49,57 @@ CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "2"))
 
 log = logging.getLogger("xrpod")
 
+def control_loop(store, hub, wake, stop, vr, ai_controller):
+    """
+    Read sensors, generate AI recommendations,
+    publish live updates, and preserve existing
+    hardware behavior.
 
-def control_loop(store, hub, wake, stop):
-    """Read sensors, publish the reading, and apply the latest settings.
-    `wake` is set when settings change so the hardware reacts immediately."""
+    AI recommendations are NOT applied to hardware.
+    """
+
     while not stop.is_set():
         try:
+            # 1. Get current pod settings
+            settings = store.get_settings()
+
+            # 2. Read simulated sensor data
+            reading = hardware.read_sensors()
+
+            # 3. Get latest VR environment information
+            vr_state = vr.latest()
+
+            # 4. Generate AI recommendation
+            recommendation = ai_controller.recommend(
+                settings=settings,
+                reading=reading,
+                vr_state=vr_state
+            )
+
+            # 5. Save and publish sensor readings
+            saved_reading = store.add_reading(reading)
+            hub.publish("reading", saved_reading)
+
+            # 6. Publish AI status for the HUD
+            ai_status = {
+                "active": recommendation.active,
+                "environment": recommendation.environment,
+                "zone": recommendation.zone,
+                "target_temp_f": recommendation.target_temp_f,
+                "fan_speed_pct": recommendation.fan_speed_pct,
+                "reason": recommendation.reason,
+                "control_mode": settings["control_mode"]
+            }
+
+            hub.publish("ai", ai_status)
+
+            # 7. Preserve the existing hardware behavior
+            # Recommendations are NOT applied.
             hardware.apply_settings(store.get_settings())
-            reading = store.add_reading(hardware.read_sensors())
-            hub.publish("reading", reading)
+
         except Exception:
-            # Keep controlling; a bad sensor read must not stop the loop.
-            log.exception("control loop error")
+            log.exception("XRPOD control loop error")
+
         wake.wait(CONTROL_SECONDS)
         wake.clear()
 
@@ -78,8 +118,10 @@ def main():
     hub = EventHub()
     vr = VrState()  # latest headset report; auto mode will read vr.latest()
     hardware.setup()
+    # Initialize the XRPOD AI supervisor
+    ai_controller = AIController()
     server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
-    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop), name="control")
+    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr, ai_controller), name="control")
     loop.start()
 
     try:
