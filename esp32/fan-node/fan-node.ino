@@ -107,7 +107,7 @@ void keepConnected() {
   if (WiFi.status() != WL_CONNECTED) {
     if ((long)(now - nextWifiMs) >= 0) {
       nextWifiMs = now + WIFI_RETRY_MS;
-      Serial.println("[net] Wi-Fi down, reconnecting");
+      Serial.printf("[net] Wi-Fi not connected (status %d), retrying\n", WiFi.status());
       WiFi.disconnect();
       WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
     }
@@ -138,14 +138,15 @@ void setup() {
   pinMode(TACH_PIN, INPUT_PULLUP);
   attachInterrupt(TACH_PIN, onTach, CHANGE);
 
+  WiFi.persistent(false);
+  WiFi.mode(WIFI_STA);  // before reading the MAC, or it reads as zeros
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
+  nextWifiMs = millis() + WIFI_RETRY_MS;  // give the first attempt time to finish
+
   uint8_t mac[6];
   WiFi.macAddress(mac);
   snprintf(clientId, sizeof(clientId), "xrpod-fan-%02x%02x%02x", mac[3], mac[4], mac[5]);
-
-  WiFi.persistent(false);
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
 
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
   mqtt.setCallback(onMessage);
