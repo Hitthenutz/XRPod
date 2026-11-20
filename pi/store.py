@@ -1,34 +1,20 @@
-"""
-XRPod data store: settings, sensor readings and change history in SQLite.
-
-Validation lives here too, so a bad
-request from any client (HUD, Unity, curl) is rejected before it can reach
-the hardware.
-
-Thread-safe: the web server and the control loop share one Store.
-"""
-
 import json
 import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
 
+
 SCENTS = ("none", "lavender", "pine", "citrus", "ocean", "rain")
-# Who is in charge: the researcher (manual) or the Pi's own control logic
-# (auto). VR state never drives the hardware in manual mode.
 CONTROL_MODES = ("manual", "auto")
-# Which experience the headset shows. "none" means no environment picked.
 ENVIRONMENTS = ("none", "beach", "forest", "desert", "sponsor")
 
-# Fields whose value must be one of a fixed list.
 CHOICES = {
     "selected_scent": SCENTS,
     "control_mode": CONTROL_MODES,
     "selected_environment": ENVIRONMENTS,
 }
 
-# field -> (kind, min, max). Mirrors src/lib/podSettings.js.
 SETTINGS_SCHEMA = {
     "target_temp_f": ("number", 50, 95),
     "target_humidity_pct": ("number", 0, 100),
@@ -53,7 +39,6 @@ DEFAULT_SETTINGS = {
     "selected_environment": "none",
 }
 
-# Keep the database small on the Pi's SD card.
 READING_RETENTION_SECONDS = 24 * 60 * 60
 HISTORY_MAX_ROWS = 5000
 MAX_CHANGED_BY_LENGTH = 64
@@ -64,52 +49,76 @@ class ValidationError(ValueError):
 
 
 def now_iso():
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z")
+    )
 
 
 def _validate_value(field, value):
     kind, lo, hi = SETTINGS_SCHEMA[field]
+
     if kind == "bool":
         if not isinstance(value, bool):
             raise ValidationError(f"{field} must be true or false")
         return value
+
     if kind == "choice":
         options = CHOICES[field]
         if not isinstance(value, str) or value not in options:
-            raise ValidationError(f"{field} must be one of {', '.join(options)}")
+            raise ValidationError(
+                f"{field} must be one of {', '.join(options)}"
+            )
         return value
-    # number / int: reject bools (True is an int in Python), NaN and inf.
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
-        raise ValidationError(f"{field} must be a number")
+
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or value != value
+        or value in (float("inf"), float("-inf"))
+    ):
+        raise ValidationError(f"{field} must be a finite number")
+
     if kind == "int":
         if value != int(value):
             raise ValidationError(f"{field} must be a whole number")
         value = int(value)
+
     if not lo <= value <= hi:
-        raise ValidationError(f"{field} must be between {lo} and {hi}")
+        raise ValidationError(
+            f"{field} must be between {lo} and {hi}"
+        )
+
     return value
 
 
 def validate_patch(patch, current):
-    """Return a cleaned patch, or raise ValidationError.
-
-    Enforces heater/AC mutual exclusion: turning one on turns the other off,
-    and asking for both on at once is rejected.
-    """
     if not isinstance(patch, dict) or not patch:
         raise ValidationError("body must be a non-empty JSON object")
+
     unknown = sorted(set(patch) - set(SETTINGS_SCHEMA))
     if unknown:
-        raise ValidationError(f"unknown field(s): {', '.join(unknown)}")
+        raise ValidationError(
+            f"unknown field(s): {', '.join(unknown)}"
+        )
 
-    clean = {field: _validate_value(field, value) for field, value in patch.items()}
+    clean = {
+        field: _validate_value(field, value)
+        for field, value in patch.items()
+    }
 
     if clean.get("heater_on") and clean.get("ac_on"):
-        raise ValidationError("heater_on and ac_on can't both be true")
+        raise ValidationError(
+            "heater_on and ac_on can't both be true"
+        )
+
     if clean.get("heater_on") and current.get("ac_on"):
         clean.setdefault("ac_on", False)
+
     if clean.get("ac_on") and current.get("heater_on"):
         clean.setdefault("heater_on", False)
+
     return clean
 
 
@@ -124,23 +133,32 @@ def _stringify(value):
 class Store:
     def __init__(self, path):
         self._lock = threading.Lock()
-        self._db = sqlite3.connect(path, check_same_thread=False)
+        self._db = sqlite3.connect(
+            path,
+            check_same_thread=False
+        )
         self._db.row_factory = sqlite3.Row
+
         self._db.executescript(
             """
             PRAGMA journal_mode = WAL;
+
             CREATE TABLE IF NOT EXISTS settings (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 data TEXT NOT NULL,
                 updated_date TEXT NOT NULL
             );
+
             CREATE TABLE IF NOT EXISTS readings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_ts REAL NOT NULL,
                 created_date TEXT NOT NULL,
                 data TEXT NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS readings_ts ON readings (created_ts);
+
+            CREATE INDEX IF NOT EXISTS readings_ts
+            ON readings (created_ts);
+
             CREATE TABLE IF NOT EXISTS change_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_date TEXT NOT NULL,
@@ -151,32 +169,40 @@ class Store:
             );
             """
         )
+
         self._settings = self._load_settings()
         self._readings_since_prune = 0
 
-    # ---------------------------------------------------------------- settings
     def _load_settings(self):
-        row = self._db.execute("SELECT data, updated_date FROM settings WHERE id = 1").fetchone()
+        row = self._db.execute(
+            "SELECT data, updated_date FROM settings WHERE id = 1"
+        ).fetchone()
+
         if row is None:
             settings = dict(DEFAULT_SETTINGS)
             updated = now_iso()
+
             with self._db:
                 self._db.execute(
-                    "INSERT INTO settings (id, data, updated_date) VALUES (1, ?, ?)",
+                    "INSERT INTO settings "
+                    "(id, data, updated_date) VALUES (1, ?, ?)",
                     (json.dumps(settings), updated),
                 )
         else:
             stored = json.loads(row["data"])
-            # Fill in fields added after this database was created; drop
-            # anything that no longer validates.
             settings = dict(DEFAULT_SETTINGS)
+
             for field, value in stored.items():
                 if field in SETTINGS_SCHEMA:
                     try:
-                        settings[field] = _validate_value(field, value)
+                        settings[field] = _validate_value(
+                            field, value
+                        )
                     except ValidationError:
                         pass
+
             updated = row["updated_date"]
+
         return {**settings, "updated_date": updated}
 
     def get_settings(self):
@@ -184,31 +210,62 @@ class Store:
             return dict(self._settings)
 
     def update_settings(self, patch, changed_by=None):
-        """Validate and save `patch`. Returns (settings, new_history_rows)."""
         if changed_by is not None:
             changed_by = str(changed_by)[:MAX_CHANGED_BY_LENGTH]
+
+        from control_authority import authorize_user_patch
+
         with self._lock:
             current = self._settings
+
+            authorize_user_patch(patch, current)
             clean = validate_patch(patch, current)
-            changed = [f for f in SETTINGS_SCHEMA if f in clean and clean[f] != current[f]]
+
+            changed = [
+                f for f in SETTINGS_SCHEMA
+                if f in clean and clean[f] != current[f]
+            ]
+
             if not changed:
                 return dict(current), []
 
             updated = now_iso()
-            new = {**current, **{f: clean[f] for f in changed}, "updated_date": updated}
-            data = {f: new[f] for f in SETTINGS_SCHEMA}
+
+            new = {
+                **current,
+                **{f: clean[f] for f in changed},
+                "updated_date": updated,
+            }
+
+            data = {
+                f: new[f]
+                for f in SETTINGS_SCHEMA
+            }
+
             rows = []
+
             with self._db:
                 self._db.execute(
-                    "UPDATE settings SET data = ?, updated_date = ? WHERE id = 1",
+                    "UPDATE settings SET data = ?, "
+                    "updated_date = ? WHERE id = 1",
                     (json.dumps(data), updated),
                 )
+
                 for field in changed:
                     cur = self._db.execute(
-                        "INSERT INTO change_log (created_date, field_name, old_value, new_value, changed_by)"
-                        " VALUES (?, ?, ?, ?, ?)",
-                        (updated, field, _stringify(current[field]), _stringify(new[field]), changed_by),
+                        "INSERT INTO change_log "
+                        "(created_date, field_name, old_value, "
+                        "new_value, changed_by) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (
+                            updated,
+                            field,
+                            _stringify(current[field]),
+                            _stringify(new[field]),
+                            changed_by,
+                        ),
                     )
+
                     rows.append({
                         "id": str(cur.lastrowid),
                         "created_date": updated,
@@ -217,47 +274,75 @@ class Store:
                         "new_value": _stringify(new[field]),
                         "changed_by": changed_by,
                     })
+
                 self._db.execute(
-                    "DELETE FROM change_log WHERE id <= (SELECT MAX(id) FROM change_log) - ?",
+                    "DELETE FROM change_log WHERE id <= "
+                    "(SELECT MAX(id) FROM change_log) - ?",
                     (HISTORY_MAX_ROWS,),
                 )
+
             self._settings = new
             return dict(new), rows
 
-    # ----------------------------------------------------------------- history
     def get_history(self, limit=50):
         limit = max(1, min(500, int(limit)))
+
         with self._lock:
             rows = self._db.execute(
-                "SELECT * FROM change_log ORDER BY id DESC LIMIT ?", (limit,)
+                "SELECT * FROM change_log "
+                "ORDER BY id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
-        return [{**dict(r), "id": str(r["id"])} for r in rows]
 
-    # ---------------------------------------------------------------- readings
+        return [
+            {**dict(r), "id": str(r["id"])}
+            for r in rows
+        ]
+
     def add_reading(self, reading):
         ts = time.time()
         created = now_iso()
+
         with self._lock, self._db:
             cur = self._db.execute(
-                "INSERT INTO readings (created_ts, created_date, data) VALUES (?, ?, ?)",
+                "INSERT INTO readings "
+                "(created_ts, created_date, data) "
+                "VALUES (?, ?, ?)",
                 (ts, created, json.dumps(reading)),
             )
+
             self._readings_since_prune += 1
+
             if self._readings_since_prune >= 500:
                 self._readings_since_prune = 0
+
                 self._db.execute(
-                    "DELETE FROM readings WHERE created_ts < ?", (ts - READING_RETENTION_SECONDS,)
+                    "DELETE FROM readings "
+                    "WHERE created_ts < ?",
+                    (ts - READING_RETENTION_SECONDS,),
                 )
-        return {**reading, "id": str(cur.lastrowid), "created_date": created}
+
+        return {
+            **reading,
+            "id": str(cur.lastrowid),
+            "created_date": created,
+        }
 
     def get_latest_reading(self):
         with self._lock:
             row = self._db.execute(
-                "SELECT id, created_date, data FROM readings ORDER BY id DESC LIMIT 1"
+                "SELECT id, created_date, data "
+                "FROM readings ORDER BY id DESC LIMIT 1"
             ).fetchone()
+
         if row is None:
             return None
-        return {**json.loads(row["data"]), "id": str(row["id"]), "created_date": row["created_date"]}
+
+        return {
+            **json.loads(row["data"]),
+            "id": str(row["id"]),
+            "created_date": row["created_date"],
+        }
 
     def close(self):
         with self._lock:
