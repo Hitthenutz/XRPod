@@ -1,6 +1,5 @@
 import { Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { Slider } from "@/components/ui/Slider";
 import { SCENTS } from "@/lib/podSettings";
 
 const SCENT_SWATCH = {
@@ -13,7 +12,6 @@ const SCENT_SWATCH = {
 };
 
 export function ScentCard({ settings, onChange }) {
-  const off = settings.selected_scent === "none";
   return (
     <Card title="Scent" icon={Sparkles}>
       <div className="space-y-5">
@@ -39,14 +37,7 @@ export function ScentCard({ settings, onChange }) {
             );
           })}
         </div>
-        <Slider
-          label="Intensity"
-          value={settings.scent_intensity_pct}
-          unit="%"
-          accent="violet"
-          disabled={off}
-          onCommit={(v) => onChange({ scent_intensity_pct: v })}
-        />
+        {/* No intensity slider: the scent node is on/off only (scent = on, none = off). */}
       </div>
     </Card>
   );

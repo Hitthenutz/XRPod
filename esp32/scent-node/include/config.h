@@ -49,8 +49,9 @@ constexpr uint32_t kMqttRetryMs = 5000;
 constexpr uint8_t kStatusLed = 2;  // on-board LED on most WROOM-32 DevKits
 
 // ---- Reserved for later (not used yet - see docs/PINOUT.md) ----------------
-// GPIO 16/17  UART2 for a PM2.5 sensor     GPIO 18  ventilation fan PWM
+// GPIO 16     master kill Q1 (bench test)  GPIO 18  ventilation fan PWM
+// GPIO 17/19  UART2 TX/RX for a PM2.5 sensor
 // GPIO 34     ventilation fan tach         GPIO 35/36/39  reservoir level inputs
-// GPIO 12-15  JTAG debugger                GPIO 19/23  spare
+// GPIO 12-15  JTAG debugger                GPIO 23  spare
 
 }  // namespace cfg

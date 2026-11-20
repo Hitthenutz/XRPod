@@ -18,12 +18,12 @@ sync with it.
 | 21 | I2C SDA | i/o | **in firmware** | BME688 now; CO2 sensor later, same bus |
 | 22 | I2C SCL | out | **in firmware** | |
 | 2 | Status LED | out | **in firmware** | On-board LED: solid = MQTT up, blink = offline |
-| 16 | UART2 RX (PM2.5 sensor TX) | in | reserved | e.g. PMS5003 |
-| 17 | UART2 TX (PM2.5 sensor RX) | out | reserved | |
+| 16 | Master kill Q1 (USB splitter power) | out | **in firmware** | Rev A carrier; HIGH = diffusers powered |
+| 17, 19 | UART2 TX / RX (PM2.5 sensor) | i/o | reserved | e.g. PMS5003; RX moved off 16 (kill switch) |
 | 18 | Ventilation fan PWM | out | reserved | 25 kHz LEDC, 4-pin PWM fan |
 | 34 | Ventilation fan tach | in | reserved | Input-only; needs external 10k pull-up to 3.3 V |
 | 35, 36 (VP), 39 (VN) | Scent reservoir level sensors | in | reserved | Input-only, no internal pull-ups |
-| 19, 23 | Spare digital | i/o | free | Safe general-purpose pins |
+| 23 | Spare digital | i/o | free | Safe general-purpose pin |
 | 12, 13, 14, 15 | JTAG (ESP-Prog debugger) | - | keep free | 12 and 15 are also boot-strapping pins |
 
 ### Never use
@@ -93,8 +93,8 @@ outlets and the ESP32 (both warm it up).
 ### Reserved: future IAQ sensors (client's future-iteration list)
 
 - **CO2** (e.g. Sensirion SCD41, I2C 0x62): same I2C bus, GPIO 21/22.
-- **PM2.5** (e.g. Plantower PMS5003, 5 V power, 3.3 V UART): sensor TX -> GPIO 16,
-  sensor RX -> GPIO 17.
+- **PM2.5** (e.g. Plantower PMS5003, 5 V power, 3.3 V UART): sensor TX -> GPIO 19,
+  sensor RX -> GPIO 17 (GPIO 16 is the master kill switch).
 - **Exhaust/ventilation fan** (4-pin PWM): PWM -> GPIO 18 through a transistor or
   open-drain buffer; tach -> GPIO 34 with a 10k pull-up to 3.3 V; 12 V fan power
   from its own supply, grounds tied together.

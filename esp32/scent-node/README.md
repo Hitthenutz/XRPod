@@ -72,6 +72,14 @@ affects it too. Upgrade to Bosch BSEC2 for proper IAQ / bVOC values later.
 
 ## Test and debug
 
+> **Right now `src/main.cpp` is the rev A carrier bench test**, not the
+> `ScentController` firmware below. It takes `?`, `k1`/`k0` (master power on
+> GPIO 16), `p25 [n]` (press a module button), `c25`/`i25`/`o25`
+> (continuous/intermittent/off), `h25`/`l25`, `x` and `s`, over USB serial or
+> MQTT (`xrpod/test/cmd`, replies on `xrpod/test/reply`). The Pi talks on
+> `xrpod/scent/*`, so the HUD can't drive scents until the real firmware is
+> back in `main.cpp`.
+
 Three levels, fastest first:
 
 1. **Unit tests on your PC** (no board): `pio test -e native` runs the
