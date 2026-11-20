@@ -1,6 +1,6 @@
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
 // Mirror CONTROL_MODES and ENVIRONMENTS in pi/store.py.
-export const CONTROL_MODES = ["manual", "auto"];
+export const FAN_LEVELS = [0, 25, 50, 75, 100];export const CONTROL_MODES = ["manual", "auto"];
 export const ENVIRONMENTS = ["none", "beach", "forest", "desert", "sponsor"];
 // Mirrors STALE_SECONDS in pi/vr.py: no headset news for this long means "not connected".
 export const VR_STALE_SECONDS = 15;
