@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 import math
 
@@ -11,6 +12,7 @@ class ControlDecision:
     settings: dict
     reason: str
     authorized: bool
+    generation: int = 0
 
 
 class ControlArbiter:
@@ -32,17 +34,14 @@ class ControlArbiter:
                 settings=dict(settings),
                 reason="Manual control active",
                 authorized=True,
+                generation=self.generation,
             )
 
         if mode != "auto":
-            return self._safe_decision(
-                "Invalid operating mode"
-            )
+            return self._safe_decision("Invalid operating mode")
 
         if not self._valid_reading(reading):
-            return self._safe_decision(
-                "Invalid sensor readings"
-            )
+            return self._safe_decision("Invalid sensor readings")
 
         if recommendation is None or not recommendation.active:
             return self._safe_decision(
@@ -77,6 +76,7 @@ class ControlArbiter:
             settings=effective,
             reason=recommendation.reason,
             authorized=True,
+            generation=self.generation,
         )
 
     def _safe_decision(self, reason):
@@ -96,6 +96,7 @@ class ControlArbiter:
             settings=safe,
             reason=reason,
             authorized=False,
+            generation=self.generation,
         )
 
     @staticmethod

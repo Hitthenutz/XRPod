@@ -36,76 +36,109 @@ from pathlib import Path
 
 import hardware
 from ai_controller import AIController
+from control_arbiter import ControlArbiter
 from ml_inference import PhysicalEnvironmentModel
+from simulation_executor import SimulationExecutor
 from store import Store
 from vr import VrState
 from web import EventHub, start_server
 
+
 HERE = Path(__file__).resolve().parent
-HUD_HOST = os.environ.get("HUD_HOST", "0.0.0.0")  # noqa: S104 - LAN server by design
+HUD_HOST = os.environ.get("HUD_HOST", "0.0.0.0")
 HUD_PORT = int(os.environ.get("HUD_PORT", "8080"))
 DB_PATH = os.environ.get("XRPOD_DB", str(HERE / "xrpod.db"))
-STATIC_DIR = os.environ.get("XRPOD_STATIC_DIR", str(HERE.parent / "hud" / "dist"))
+STATIC_DIR = os.environ.get(
+    "XRPOD_STATIC_DIR",
+    str(HERE.parent / "hud" / "dist"),
+)
 CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "2"))
 
 log = logging.getLogger("xrpod")
 
-def control_loop(store, hub, wake, stop, vr, ai_controller, ml_model):
-    """
-    Read sensors, generate AI recommendations,
-    publish live updates, and preserve existing
-    hardware behavior.
 
-    AI recommendations are NOT applied to hardware.
-    """
+class UnavailableModel:
+    def predict(self, reading):
+        return {
+            "prediction": "UNKNOWN",
+            "confidence": 0.0,
+        }
+
+
+def control_loop(
+    store, hub, wake, stop, vr, ai_controller,
+    ml_model, arbiter, simulation_executor=None
+):
+    if simulation_executor is None:
+        simulation_executor = SimulationExecutor()
 
     while not stop.is_set():
         try:
-            # 1. Get current pod settings
             settings = store.get_settings()
-
-            # 2. Read simulated sensor data
             reading = hardware.read_sensors()
-            # Predict physical environmental conditions.
-            # This is monitoring-only; it does not control hardware.
-            physical_prediction = ml_model.predict(reading)
-            
-
-            # 3. Get latest VR environment information
             vr_state = vr.latest()
 
-            # 4. Generate AI recommendation
+            try:
+                physical_prediction = ml_model.predict(reading)
+            except Exception:
+                log.exception("ML inference failed")
+                physical_prediction = {
+                    "prediction": "UNKNOWN",
+                    "confidence": 0.0,
+                }
+
             recommendation = ai_controller.recommend(
                 settings=settings,
                 reading=reading,
-                vr_state=vr_state
+                vr_state=vr_state,
             )
 
-            # 5. Save and publish sensor readings
+            decision = arbiter.resolve(
+                settings=settings,
+                recommendation=recommendation,
+                reading=reading,
+            )
+
+            current_settings = store.get_settings()
+
+            if current_settings.get("control_mode") != settings.get("control_mode"):
+                simulation_result = simulation_executor.stop(
+                    "Operating mode changed"
+                )
+            else:
+                simulation_result = simulation_executor.execute(
+                    decision=decision,
+                    current_settings=current_settings,
+                    generation=arbiter.generation,
+                )
+
             saved_reading = store.add_reading(reading)
             hub.publish("reading", saved_reading)
 
-            # 6. Publish AI status for the HUD
-            ai_status = {
+            hub.publish("ai", {
                 "active": recommendation.active,
                 "environment": recommendation.environment,
                 "zone": recommendation.zone,
                 "target_temp_f": recommendation.target_temp_f,
                 "fan_speed_pct": recommendation.fan_speed_pct,
                 "reason": recommendation.reason,
-                "control_mode": settings["control_mode"],
+                "control_mode": current_settings["control_mode"],
                 "physical_environment": physical_prediction["prediction"],
                 "model_confidence": physical_prediction["confidence"],
-            }
+                "control_source": decision.source,
+                "control_authorized": decision.authorized,
+                "control_reason": decision.reason,
+                "effective_settings": decision.settings,
+                "control_generation": arbiter.generation,
+                "execution_mode": "simulation",
+                "simulation": simulation_result,
+            })
 
-            hub.publish("ai", ai_status)
-
-            # 7. Preserve the existing hardware behavior
-            # Recommendations are NOT applied.
             hardware.apply_settings(store.get_settings())
 
         except Exception:
             log.exception("XRPOD control loop error")
+            simulation_executor.stop("Control loop failure")
 
         wake.wait(CONTROL_SECONDS)
         wake.clear()
@@ -116,33 +149,78 @@ def main():
         level=os.environ.get("LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
     stop = threading.Event()
     wake = threading.Event()
-    # systemd stops services with SIGTERM; treat it like Ctrl+C.
+
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
 
     store = Store(DB_PATH)
     hub = EventHub()
-    vr = VrState()  # latest headset report; auto mode will read vr.latest()
-    hardware.setup()
-    # Initialize the XRPOD AI supervisor
+    vr = VrState()
+
     ai_controller = AIController()
-    ml_model = PhysicalEnvironmentModel()
-    server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
-    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr, ai_controller, ml_model), name="control")
-    loop.start()
+    arbiter = ControlArbiter()
+    simulation_executor = SimulationExecutor()
 
     try:
+        ml_model = PhysicalEnvironmentModel()
+    except Exception:
+        log.exception("ML model unavailable")
+        ml_model = UnavailableModel()
+
+    server = None
+    loop = None
+
+    try:
+        hardware.setup()
+
+        server = start_server(
+            store,
+            hub,
+            HUD_HOST,
+            HUD_PORT,
+            STATIC_DIR,
+            on_settings_changed=wake.set,
+            vr=vr,
+        )
+
+        loop = threading.Thread(
+            target=control_loop,
+            args=(
+                store,
+                hub,
+                wake,
+                stop,
+                vr,
+                ai_controller,
+                ml_model,
+                arbiter,
+                simulation_executor,
+            ),
+            name="control",
+        )
+
+        loop.start()
+
         while not stop.is_set():
             time.sleep(0.5)
+
     except KeyboardInterrupt:
         pass
+
     finally:
         log.info("stopping")
         stop.set()
         wake.set()
-        loop.join(timeout=5)
-        server.shutdown()
+
+        if loop is not None:
+            loop.join(timeout=5)
+
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+
         hardware.cleanup()
         store.close()
 
