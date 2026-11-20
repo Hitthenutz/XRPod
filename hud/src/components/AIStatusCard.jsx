@@ -6,11 +6,22 @@ import {
   WifiOff,
 } from "lucide-react";
 
+function InfoTile({ label, value }) {
+  return (
+    <div className="rounded-xl bg-slate-800 p-3">
+      <p className="text-xs text-slate-400">{label}</p>
+      <p className="mt-1 font-semibold">{value}</p>
+    </div>
+  );
+}
+
 export function AIStatusCard({ settings, aiStatus, connected }) {
   const isAuto = settings?.control_mode === "auto";
   const active = isAuto && aiStatus?.active === true;
   const confidence = aiStatus?.model_confidence;
   const effective = aiStatus?.effective_settings;
+  const simulation = aiStatus?.simulation;
+  const simulatedState = simulation?.state;
 
   const confidenceDisplay =
     typeof confidence === "number" && Number.isFinite(confidence)
@@ -26,6 +37,8 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
   const authorized = aiStatus?.control_authorized === true;
   const executionMode = aiStatus?.execution_mode ?? "unknown";
 
+  const simulationAccepted = simulation?.accepted === true;
+
   return (
     <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
       <div className="mb-5 flex items-center justify-between">
@@ -36,7 +49,7 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
               XRPOD AI Supervisor
             </h2>
             <p className="text-xs text-slate-400">
-              Environment-aware AI monitoring
+              Environment-aware AI monitoring and simulation
             </p>
           </div>
         </div>
@@ -129,8 +142,8 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
             </div>
 
             <p className="mt-3 text-xs text-slate-400">
-              Experimental model trained on simulated data.
-              Monitoring only.
+              Experimental Random Forest model trained on
+              simulated data. Monitoring only.
             </p>
           </div>
 
@@ -180,6 +193,59 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
             </p>
           </div>
 
+          <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h3 className="font-semibold">
+                Simulation Control
+              </h3>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  simulationAccepted
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "bg-amber-500/20 text-amber-300"
+                }`}
+              >
+                {!simulation
+                  ? "WAITING"
+                  : simulationAccepted
+                    ? "ACCEPTED"
+                    : "REJECTED"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <InfoTile
+                label="Simulated Target"
+                value={
+                  simulatedState?.target_temp_f != null
+                    ? `${simulatedState.target_temp_f}°F`
+                    : "—"
+                }
+              />
+              <InfoTile
+                label="Simulated Fan Speed"
+                value={
+                  simulatedState?.fan_speed_pct != null
+                    ? `${simulatedState.fan_speed_pct}%`
+                    : "—"
+                }
+              />
+              <InfoTile
+                label="Simulated Heater"
+                value={simulatedState?.heater_on ? "ON" : "OFF"}
+              />
+              <InfoTile
+                label="Simulated AC"
+                value={simulatedState?.ac_on ? "ON" : "OFF"}
+              />
+            </div>
+
+            <p className="mt-4 text-sm text-slate-400">
+              {simulation?.reason ?? "Waiting for simulation data"}
+            </p>
+          </div>
+
           <div className="mt-4 rounded-xl bg-slate-800/50 p-3">
             <p className="mb-1 text-xs font-semibold">
               AI Recommendation Reason
@@ -193,17 +259,8 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
 
       <div className="mt-5 flex items-center gap-2 border-t border-slate-800 pt-4 text-xs text-emerald-400">
         <ShieldCheck className="h-4 w-4" />
-        Preview only — AI commands are not applied to hardware
+        Simulation only — no AI commands applied to physical hardware
       </div>
     </section>
-  );
-}
-
-function InfoTile({ label, value }) {
-  return (
-    <div className="rounded-xl bg-slate-800 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-1 font-semibold capitalize">{value}</p>
-    </div>
   );
 }
