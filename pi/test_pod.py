@@ -13,6 +13,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -342,6 +343,55 @@ class MqttTests(unittest.TestCase):
         self.assertIn(scent.TOPIC_NODE.encode(), got["subscribe"][2])
         topic, payload, _, _ = mqtt.parse_publish(got["publish"][1], got["publish"][2])
         self.assertEqual((topic, json.loads(payload)), (scent.TOPIC_CMD, scent.OFF))
+
+
+    def test_pings_while_only_sending(self):
+        """The Pi resends commands every few seconds, so it is always sending.
+        If no node publishes, it hears nothing back unless it pings; without a
+        ping it would decide the broker is gone and reconnect over and over."""
+        server = socket.socket()
+        server.bind(("127.0.0.1", 0))
+        server.listen(1)
+        server.settimeout(5)
+        pings = []
+
+        def broker():
+            conn, _ = server.accept()
+            conn.settimeout(0.2)
+            buf = bytearray()
+            end = time.monotonic() + 4.5
+            while time.monotonic() < end:
+                try:
+                    data = conn.recv(4096)
+                except TimeoutError:
+                    continue
+                if not data:
+                    break
+                buf += data
+                while (pkt := mqtt.parse_packet(buf)) is not None:
+                    if pkt[0] == mqtt.CONNECT:
+                        conn.sendall(bytes([0x20, 2, 0, 0]))  # CONNACK ok
+                    elif pkt[0] == mqtt.PINGREQ:
+                        pings.append(time.monotonic())
+                        conn.sendall(bytes([0xD0, 0]))  # PINGRESP
+            conn.close()
+
+        thread = threading.Thread(target=broker)
+        thread.start()
+        client = mqtt.MqttClient("127.0.0.1", server.getsockname()[1], client_id="test", keepalive=2)
+        client.start()
+        end = time.monotonic() + 4
+        while time.monotonic() < end:  # keep sending, like the scent/fan resends
+            client.publish(scent.TOPIC_CMD, json.dumps(scent.OFF))
+            threading.Event().wait(0.3)
+        still_connected = client.connected
+        client.close()
+        thread.join(timeout=5)
+        server.close()
+
+        self.assertTrue(pings, "client never pinged while it was only sending")
+        self.assertTrue(still_connected, "client dropped a broker that was answering pings")
+
 
 class StoreTests(unittest.TestCase):
     def setUp(self):
