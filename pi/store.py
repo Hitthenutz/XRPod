@@ -15,7 +15,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
-SCENTS = ("none", "lavender", "pine", "citrus", "ocean", "rain")
+SCENTS = ("none", "lavender", "pine", "citrus")  # must match the scent node (esp32/scent-node)
 # Who is in charge: the researcher (manual) or the Pi's own control logic
 # (auto). VR state never drives the hardware in manual mode.
 CONTROL_MODES = ("manual", "auto")

@@ -7,8 +7,6 @@ const SCENT_SWATCH = {
   lavender: "bg-violet-400",
   pine: "bg-emerald-500",
   citrus: "bg-amber-400",
-  ocean: "bg-cyan-400",
-  rain: "bg-indigo-400",
 };
 
 export function ScentCard({ settings, onChange }) {
