@@ -25,12 +25,25 @@ namespace XRPod.VR
                 return;
             }
 
-            var lit = Shader.Find("Universal Render Pipeline/Lit");
-            if (lit == null)
+            var fixedNames = FixFolder(folder);
+            if (fixedNames == null)
             {
                 EditorUtility.DisplayDialog("Fix Pink Materials", "Couldn't find URP's Lit shader.", "OK");
                 return;
             }
+            EditorUtility.DisplayDialog("Fix Pink Materials",
+                fixedNames.Count == 0
+                    ? "Nothing to fix in " + folder + ": no pink materials found."
+                    : $"Fixed {fixedNames.Count} material(s):\n" + string.Join(", ", fixedNames),
+                "OK");
+        }
+
+        // Fixes every pink material in `folder` (e.g. a store pack's).
+        // Returns the names of the ones changed, or null without URP's Lit.
+        internal static List<string> FixFolder(string folder)
+        {
+            var lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit == null) return null;
 
             var fixedNames = new List<string>();
             foreach (var guid in AssetDatabase.FindAssets("t:Material", new[] { folder }))
@@ -56,12 +69,7 @@ namespace XRPod.VR
                 fixedNames.Add(mat.name);
             }
             AssetDatabase.SaveAssets();
-
-            EditorUtility.DisplayDialog("Fix Pink Materials",
-                fixedNames.Count == 0
-                    ? "Nothing to fix in " + folder + ": no pink materials found."
-                    : $"Fixed {fixedNames.Count} material(s):\n" + string.Join(", ", fixedNames),
-                "OK");
+            return fixedNames;
         }
 
         // The selected folder (or the folder of a selected file), else the

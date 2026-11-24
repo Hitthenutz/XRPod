@@ -56,23 +56,42 @@ shore (priority 15 vs 10); the waterline's wind and spray beat shade (20).
 
 ### Forest
 
+`Forest_v1` is made from the free Fantasy Forest pack (ForestVision was
+too slow on the headset) with **XRPod → Make Forest v1 (from Fantasy
+Forest) + Place Zones**. The zones come from the trees' real shade, the
+same way as the desert's (below): for the check, each nearby tree's leaf
+and trunk meshes block the sun. Run **XRPod → Forest: Place Zones From
+Real Shade** again after moving the sun; a map is saved to
+`vr/Logs/xrpod-forest-zones.png`.
+
 | Zone id | Where | What you'd feel | Temp °F | Fan % | Humidity % | Scent |
 |---|---|---|---|---|---|---|
-| `forest-open` | Under the trees (base) | Mild, still, earthy | 70 | 10 | 60 | pine 30 % |
-| `forest-clearing` | Sunny clearing ahead | Warmer, light breeze | 78 | 25 | 50 | pine 15 % |
-| `forest-rain` | Rainy area, front left (light cloud) | Cooler, damp | 66 | 20 | 75 | rain 40 % |
-| `forest-rain-heavy` | Middle of the rain (dark cloud) | Cool, very wet, gusty | 62 | 30 | 90 | rain 80 % |
-| `forest-stream` | Along the stream, right | Cool and humid | 66 | 15 | 70 | pine 20 % |
+| `forest-open` | Between the trees in the sun (base) | Mild, light breeze, earthy | 72 | 15 | 55 | pine 25 % |
+| `forest-shade` | In a tree's shadow | Cool, still, damp | 66 | 5 | 65 | pine 35 % |
+| `forest-clearing` | Open sky at least 7 m from any tree | Warmer, breezier | 78 | 30 | 45 | pine 15 % |
+| `forest-hilltop` | The highest open ground (top tenth, at least 2 m above the start) | Windy | 70 | 60 | 50 | pine 20 % |
+
+Priorities: shade 15, clearing and hilltop 10, open 0. The photo forest
+(`Forest`, with rain) is still in the project as the test world.
 
 ### Desert
+
+Placed from the real shadows in `Desert_v1` with **XRPod → Desert: Place
+Zones From Real Shade**: every square metre within 60 m of the start is
+checked for whether you can walk there and whether a line from your body
+to the sun is blocked. Shade zones follow each shadow's shape (several
+boxes with one id). Run it again after moving the sun or the scenery; a
+map is saved to `vr/Logs/xrpod-desert-zones.png`.
 
 | Zone id | Where | What you'd feel | Temp °F | Fan % | Humidity % | Scent |
 |---|---|---|---|---|---|---|
 | `desert-open` | Open sun (base) | Hot and dry | 92 | 15 | 15 | none |
-| `desert-ridge` | Ridge to the left | Hot, strong dry wind | 90 | 70 | 10 | none |
-| `desert-rock-shade` | Shade next to the big rock, far right | Shade: a bit cooler | 82 | 10 | 15 | none |
-| `desert-cave-mouth` | Cave entrance ahead | Shaded, cooler | 80 | 5 | 20 | none |
-| `desert-cave-inside` | Inside the cave | Cool, still air | 72 | 0 | 25 | none |
+| `desert-ridge` | The highest open ground (top tenth, at least 2 m above the start) | Hot, strong dry wind | 90 | 70 | 10 | none |
+| `desert-shade` | In the shadow of rocks, walls, the raft or the tower | Shade: a bit cooler | 82 | 10 | 15 | none |
+| `desert-covered` | Under a roof or awning (shade with something overhead) | Cooler, still air | 78 | 5 | 20 | none |
+| `desert-campfire` | Within about 1.7 m of a fire pit | Warm on the skin | 95 | 0 | 15 | none |
+
+Priorities: campfire 25, covered 20, shade 15, ridge 10, open 0.
 
 ### Sponsor
 

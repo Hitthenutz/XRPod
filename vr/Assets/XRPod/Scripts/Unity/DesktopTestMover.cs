@@ -30,7 +30,7 @@ namespace XRPod.VR
         [Tooltip("The camera, tilted up and down. The rig itself turns left and right.")]
         [SerializeField] Transform head;
         [SerializeField] float walkSpeed = 2f;
-        [SerializeField] float runSpeed = 5f;
+        [SerializeField] float runSpeed = 9f;
         [Tooltip("Degrees per pixel of mouse movement.")]
         [SerializeField] float lookSpeed = 0.15f;
         [Tooltip("How high the eyes are above the ground, in metres.")]
@@ -43,9 +43,17 @@ namespace XRPod.VR
         Scene _waterScene;
         float? _waterLevel;
 
-        void Start()
+        // Eyes exactly Eye Height above the feet. Done every frame, after
+        // everything else: on the VR rig the camera sits under a "Camera
+        // Offset" that the XR Origin lifts by itself (1.36 m without a
+        // headset), so setting the camera's own height once put the eyes
+        // about 3 m up, above the beach umbrellas. With a headset on, the
+        // headset decides the height and this does nothing.
+        void LateUpdate()
         {
-            if (head != null) head.localPosition = new Vector3(head.localPosition.x, eyeHeight, head.localPosition.z);
+            if (head == null || XRSettings.isDeviceActive) return;
+            var p = head.position;
+            head.position = new Vector3(p.x, transform.position.y + eyeHeight, p.z);
         }
 
         // Bottom-left: what the feet are on and how high the eyes are above

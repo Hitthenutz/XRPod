@@ -50,6 +50,8 @@ namespace XRPod.VR
         [SerializeField] bool autoFind = true;
         [Tooltip("Show the connection status in front of the user (hidden while connected).")]
         [SerializeField] bool showStatus = true;
+        [Tooltip("Send the HUD a small picture of what the user sees, a few times a second (HeadsetLiveView).")]
+        [SerializeField] bool sendLiveView = true;
         [SerializeField] float pollSeconds = 1f;
         [SerializeField] float resendSeconds = 5f;
         [SerializeField] int timeoutSeconds = 3;
@@ -85,6 +87,7 @@ namespace XRPod.VR
         {
             CurrentUrl = PodAddresses.Normalize(baseUrl);
             if (showStatus) PodStatusDisplay.Create(this);
+            if (sendLiveView && !TryGetComponent<HeadsetLiveView>(out _)) gameObject.AddComponent<HeadsetLiveView>();
         }
 
         void OnEnable()

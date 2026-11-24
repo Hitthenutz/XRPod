@@ -27,23 +27,77 @@ namespace XRPod.VR
     {
         const string SceneFolder = "Assets/XRPod/Scenes";
 
+        const string ForestPack = "Assets/Fantasy Forest Environment Free Sample";
+        const string ForestPackScene = "demoScene_free";
+
         [MenuItem("XRPod/Make Beach v1 (from Beach - resort)")]
-        static void MakeBeachV1() => MakeWorld(EnvironmentId.Beach, "Beach", "Assets/Beach - resort");
+        static void MakeBeachV1() => Done(MakeWorld(EnvironmentId.Beach, "Beach", "Assets/Beach - resort"));
 
         // Forest and desert also get collision shapes straight away (the
         // beach gets them from XRPod > Finish Beach v1, after resizing).
-        [MenuItem("XRPod/Make Forest v1 (from ForestVision)")]
-        static void MakeForestV1() =>
-            MakeWorld(EnvironmentId.Forest, "Forest", "Assets/ForestVision", "Sample1", addColliders: true);
+        //
+        // The forest comes from the free Fantasy Forest pack: one terrain with
+        // painted trees and grass, light enough for the headset (ForestVision,
+        // the earlier Forest_v1, was too slow). Its pink materials are fixed
+        // first, the terrain is set up for the Quest, then the zones are placed
+        // from the trees' real shade (XRPodZoneTools).
+        [MenuItem("XRPod/Make Forest v1 (from Fantasy Forest) + Place Zones")]
+        static void MakeForestV1()
+        {
+            if (!AssetDatabase.IsValidFolder(ForestPack))
+            {
+                EditorUtility.DisplayDialog("XRPod", "Import the free Fantasy Forest Environment pack first " +
+                    "(Window > Package Manager > My Assets).", "OK");
+                return;
+            }
+            var fixedMaterials = XRPodFixMaterials.FixFolder(ForestPack)?.Count ?? 0;
+            var made = MakeWorld(EnvironmentId.Forest, "Forest", ForestPack, ForestPackScene, addColliders: true);
+            if (made == null) return;
+
+            var scene = SceneManager.GetActiveScene();
+            var terrains = QuestFriendlyTerrain(scene);
+            EditorSceneManager.SaveScene(scene);
+            var zones = XRPodZoneTools.PlaceForestZones();
+            Done(made + $"\n\nFixed {fixedMaterials} pink material(s) and set {terrains} terrain(s) up for the Quest " +
+                 "(grass drawn up to 35 m away, far trees as flat pictures).\n\n" + zones);
+        }
 
         [MenuItem("XRPod/Make Desert v1 (from Raft on the desert)")]
         static void MakeDesertV1() =>
-            MakeWorld(EnvironmentId.Desert, "Desert", "Assets/EmaceArt - raft on the desert", "DemoScene_New2026", addColliders: true);
+            Done(MakeWorld(EnvironmentId.Desert, "Desert", "Assets/EmaceArt - raft on the desert", "DemoScene_New2026", addColliders: true));
 
-        // ForestVision's grass is about as tall as a person, so it fills your
-        // view (on the headset too, where your eyes are at your real height).
-        // Shrinks every kind of grass and plant to at most knee height.
-        // Changes a copy of the terrain (the pack's own stays as it was).
+        static void Done(string message)
+        {
+            if (message != null) EditorUtility.DisplayDialog("XRPod", message, "OK");
+        }
+
+        // Terrain settings that keep a painted forest smooth on the headset:
+        // grass and plants only nearby, distant trees as billboards, a
+        // slightly coarser ground mesh, and GPU instancing.
+        static int QuestFriendlyTerrain(Scene scene)
+        {
+            var count = 0;
+            foreach (var root in scene.GetRootGameObjects())
+            foreach (var terrain in root.GetComponentsInChildren<Terrain>(true))
+            {
+                terrain.detailObjectDistance = 35f;
+                terrain.detailObjectDensity = Mathf.Min(terrain.detailObjectDensity, 0.6f);
+                terrain.treeDistance = 200f;
+                terrain.treeBillboardDistance = 30f;
+                terrain.treeMaximumFullLODCount = 30;
+                terrain.heightmapPixelError = Mathf.Max(terrain.heightmapPixelError, 8f);
+                terrain.basemapDistance = 80f;
+                terrain.drawInstanced = true;
+                EditorUtility.SetDirty(terrain);
+                count++;
+            }
+            return count;
+        }
+
+        // Grass from a forest pack is often about as tall as a person, so it
+        // fills your view (on the headset too, where your eyes are at your
+        // real height). Shrinks every kind of grass and plant to at most knee
+        // height. Changes a copy of the terrain (the pack's own stays as it was).
         [MenuItem("XRPod/Shorten Forest Grass")]
         static void ShortenForestGrass()
         {
@@ -61,7 +115,7 @@ namespace XRPod.VR
             {
                 // Always start again from the pack's original grass, so this
                 // can be re-run with a different height.
-                var data = XRPodWorldFit.CopyTerrainData(OriginalTerrain(terrain.terrainData), "Assets/ForestVision", scene.name);
+                var data = XRPodWorldFit.CopyTerrainData(OriginalTerrain(terrain.terrainData), ForestPack, scene.name);
                 terrain.terrainData = data;
                 var collider = terrain.GetComponent<TerrainCollider>();
                 if (collider != null) collider.terrainData = data;
@@ -110,10 +164,10 @@ namespace XRPod.VR
         }
 
         // The pack's own terrain that Forest_v1 was copied from (the one its
-        // Sample1 scene uses), or `current` if that can't be found.
+        // demo scene uses), or `current` if that can't be found.
         static TerrainData OriginalTerrain(TerrainData current)
         {
-            foreach (var path in AssetDatabase.GetDependencies("Assets/ForestVision/Scenes/Sample1.unity", false))
+            foreach (var path in AssetDatabase.GetDependencies($"{ForestPack}/Scenes/{ForestPackScene}.unity", false))
             {
                 var data = AssetDatabase.LoadAssetAtPath<TerrainData>(path);
                 if (data != null) return data;
@@ -132,33 +186,35 @@ namespace XRPod.VR
             return tallest > 0f ? tallest : 1f;
         }
 
-        static void MakeWorld(EnvironmentId environment, string world, string packFolder,
+        // Returns a message for the user, or null if it stopped (after
+        // telling them why).
+        static string MakeWorld(EnvironmentId environment, string world, string packFolder,
             string sceneName = null, bool addColliders = false)
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode)
             {
                 EditorUtility.DisplayDialog("XRPod", "Stop Play mode first.", "OK");
-                return;
+                return null;
             }
             var source = FindScene(packFolder, sceneName);
             if (source == null)
             {
                 EditorUtility.DisplayDialog("XRPod",
                     $"No {(sceneName ?? "scene")} found in {packFolder}. Import the pack first.", "OK");
-                return;
+                return null;
             }
             var target = $"{SceneFolder}/{world}_v1.unity";
             if (File.Exists(target) && !EditorUtility.DisplayDialog("XRPod",
                     $"{world}_v1 already exists. Replace it with a fresh copy of the pack's scene? " +
                     "Anything you changed in it (e.g. zones you lined up) will be lost.", "Replace", "Cancel"))
-                return;
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+                return null;
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return null;
 
             if (File.Exists(target)) AssetDatabase.DeleteAsset(target);
             if (!AssetDatabase.CopyAsset(source, target))
             {
                 EditorUtility.DisplayDialog("XRPod", $"Couldn't copy {source}.", "OK");
-                return;
+                return null;
             }
 
             var scene = EditorSceneManager.OpenScene(target, OpenSceneMode.Single);
@@ -192,15 +248,15 @@ namespace XRPod.VR
             PointLoaderAt(environment, $"{world}_v1");
 
             EditorSceneManager.OpenScene(target, OpenSceneMode.Single);
-            EditorUtility.DisplayDialog("XRPod",
-                $"{world}_v1 is ready and the app now uses it for {world}.\n\n" +
-                $"Removed {removedCameras} camera(s), turned off {volumes} post-processing volume(s), " +
-                (addColliders ? $"added collision shapes to {colliders} object(s), " : "") +
-                $"added a start spot{(ground ? "" : " and an invisible floor")}" +
-                (zonesCopied ? ", and copied the zones from the test world.\n\n" : ".\n\nNo test world zones found: run XRPod > Create Test Scenes, then this again.\n\n") +
-                "Next: in the Hierarchy open 'Zones', and move and scale each zone box to fit the scenery " +
-                "(e.g. beach-waterline along the water). Press Z in Play mode to see the zone pads.",
-                "OK");
+            return $"{world}_v1 is ready and the app now uses it for {world}.\n\n" +
+                   $"Removed {removedCameras} camera(s), turned off {volumes} post-processing volume(s), " +
+                   (addColliders ? $"added collision shapes to {colliders} object(s), " : "") +
+                   $"added a start spot{(ground ? "" : " and an invisible floor")}" +
+                   (environment == EnvironmentId.Forest
+                       ? "."
+                       : (zonesCopied ? ", and copied the zones from the test world.\n\n" : ".\n\nNo test world zones found: run XRPod > Create Test Scenes, then this again.\n\n") +
+                         "Next: in the Hierarchy open 'Zones', and move and scale each zone box to fit the scenery " +
+                         "(e.g. beach-waterline along the water). Press Z in Play mode to see the zone pads.");
         }
 
         // Removes every camera (and its audio listener). Returns where the
@@ -290,7 +346,7 @@ namespace XRPod.VR
 
         // Sets the scene Bootstrap's Environment Scene Loader loads for this
         // environment.
-        static void PointLoaderAt(EnvironmentId environment, string sceneName)
+        internal static void PointLoaderAt(EnvironmentId environment, string sceneName)
         {
             var scene = EditorSceneManager.OpenScene($"{SceneFolder}/Bootstrap.unity", OpenSceneMode.Single);
             foreach (var root in scene.GetRootGameObjects())

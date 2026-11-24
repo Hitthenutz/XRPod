@@ -111,11 +111,16 @@ namespace XRPod.VR
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel32;
             PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed; // the Pi serves plain HTTP
             PlayerSettings.colorSpace = ColorSpace.Linear;
+            // Vulkan only (Meta's recommendation for Quest). With OpenGL ES as
+            // well, every shader is built twice: much slower builds and a
+            // bigger app, for a fallback the Quest never uses.
+            PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
+            PlayerSettings.SetGraphicsAPIs(BuildTarget.Android, new[] { UnityEngine.Rendering.GraphicsDeviceType.Vulkan });
             AssetDatabase.SaveAssets();
 
             EditorUtility.DisplayDialog("XRPod",
                 "Quest settings applied: app name XRPod (edu.csus.xrpod), 64-bit IL2CPP, Android 12L or newer, " +
-                "plain HTTP allowed.\n\nNext (vr/docs/UNITY_SETUP.md step 7): File > Build Profiles > Android > " +
+                "Vulkan graphics, plain HTTP allowed.\n\nNext (vr/docs/UNITY_SETUP.md step 7): File > Build Profiles > Android > " +
                 "Switch Platform, then Project Validation > Fix All.", "OK");
         }
 
