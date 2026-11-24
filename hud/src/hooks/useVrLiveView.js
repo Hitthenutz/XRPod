@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { getVrFrame } from "@/api/pod";
 
-// The headset sends a picture about 5 times a second; ask a bit faster so
-// the HUD shows each one soon after it arrives. One request at a time.
-const POLL_MS = 150;
+// The headset sends about 8 pictures a second; ask a bit faster so the HUD
+// shows each one soon after it arrives. One request at a time.
+const POLL_MS = 80;
 // After an error (e.g. the Pi is unreachable), wait before trying again.
 const RETRY_MS = 2000;
 
