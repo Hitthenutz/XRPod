@@ -1,5 +1,6 @@
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { AirflowCard } from "@/components/AirflowCard";
+import { DataLogCard } from "@/components/DataLogCard";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { ReadoutsPanel } from "@/components/ReadoutsPanel";
 import { ScentCard } from "@/components/ScentCard";
@@ -64,6 +65,7 @@ export default function App() {
               <ScentCard settings={settings} onChange={applyChanges} />
             </fieldset>
             <HistoryPanel />
+            <DataLogCard />
           </div>
         ) : (
           !error && (

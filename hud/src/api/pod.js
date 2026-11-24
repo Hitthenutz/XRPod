@@ -40,6 +40,30 @@ export async function getVrFrame(signal) {
   return res.blob();
 }
 
+// ---- data log (pi/datalog.py) ----
+// Events (node offline, sensor stopped, faults...), newest first. level
+// "warning" leaves out info.
+export const getLogEvents = (limit = 100, level = "info") =>
+  request(`/log/events?limit=${limit}&level=${level}`);
+
+// Recording sessions, newest first; the one recording has recording: true.
+export const getSessions = () => request("/log/sessions");
+
+// {action: "start", name} | {action: "stop"} | {action: "delete", id}
+export const changeSession = (body) =>
+  request("/log/session", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+// Link to a CSV download: kind "readings" or "events", for {session: id} or
+// {minutes: n}.
+export function logCsvUrl(kind, { session, minutes } = {}) {
+  const query = session != null ? `session=${encodeURIComponent(session)}` : `minutes=${minutes ?? 60}`;
+  return `/api/log/${kind}.csv?${query}`;
+}
+
 // One shared live connection for the whole HUD. EventSource reconnects by
 // itself; `onOpen` fires on every (re)connect so callers can refetch anything
 // they missed while offline.
@@ -48,7 +72,7 @@ let source = null;
 
 function connect() {
   source = new EventSource("/api/events");
-  for (const type of ["settings", "reading", "history", "vr"]) {
+  for (const type of ["settings", "reading", "history", "vr", "event", "session"]) {
     source.addEventListener(type, (e) => {
       const data = JSON.parse(e.data);
       for (const l of listeners) l[type]?.(data);
@@ -60,7 +84,8 @@ function connect() {
 }
 
 /**
- * Subscribe to live events: `{ settings(s), reading(r), history(rows), vr(state), open() }`.
+ * Subscribe to live events: `{ settings(s), reading(r), history(rows), vr(state),
+ * event(e), session(sessions), open() }`.
  * Returns an unsubscribe function.
  */
 export function subscribe(handlers) {
