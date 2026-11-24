@@ -10,7 +10,7 @@
 // Wi-Fi never piles up requests. Like everything here it only reports: the
 // Pi keeps the newest picture in memory and never stores it.
 //
-// Cost on the headset: one extra 640 x 360 render about 4 times a second,
+// Cost on the headset: one extra 512 x 288 render about 8 times a second,
 // without shadows or post-processing. Lower Frames Per Second or the size if
 // a world gets choppy; untick Send Live View on HttpPodLink to turn it off.
 
@@ -29,11 +29,13 @@ namespace XRPod.VR
     [RequireComponent(typeof(HttpPodLink))]
     public sealed class HeadsetLiveView : MonoBehaviour
     {
-        [SerializeField] int width = 640;
-        [SerializeField] int height = 360;
+        // 8 smaller pictures a second cost the headset about the same as 4
+        // bigger ones did (fewer pixels each), but look much smoother.
+        [SerializeField] int width = 512;
+        [SerializeField] int height = 288;
         [Tooltip("Pictures per second sent to the HUD.")]
-        [SerializeField, Range(1f, 10f)] float framesPerSecond = 4f;
-        [SerializeField, Range(20, 90)] int jpegQuality = 50;
+        [SerializeField, Range(1f, 15f)] float framesPerSecond = 8f;
+        [SerializeField, Range(20, 90)] int jpegQuality = 45;
         [Tooltip("Vertical field of view of the picture, in degrees.")]
         [SerializeField] float fieldOfView = 75f;
         [Tooltip("Tick if the picture shows upside down in the HUD.")]
@@ -74,6 +76,12 @@ namespace XRPod.VR
 
         void OnEnable() => StartCoroutine(Capture());
 
+        // A finished picture goes out straight away (not on the next tick).
+        void Update()
+        {
+            if (_ready != null && !_sending) StartCoroutine(Send(Interlocked.Exchange(ref _ready, null)));
+        }
+
         void OnDestroy()
         {
             if (_target != null) _target.Release();
@@ -86,9 +94,10 @@ namespace XRPod.VR
             while (true)
             {
                 yield return wait;
-                if (_ready != null && !_sending) StartCoroutine(Send(Interlocked.Exchange(ref _ready, null)));
                 if (_link.Status != PodLinkStatus.Connected || Time.realtimeSinceStartup < _pausedUntil) continue;
-                if (_sending || Interlocked.CompareExchange(ref _working, 1, 0) != 0) continue;
+                // The next picture can be made while the last one is still
+                // on its way; only the newest one waiting is ever sent.
+                if (Interlocked.CompareExchange(ref _working, 1, 0) != 0) continue;
 
                 var head = Camera.main;
                 if (head == null || head == _eye)
