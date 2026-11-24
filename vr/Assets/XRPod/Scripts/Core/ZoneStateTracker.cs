@@ -5,6 +5,8 @@
 //   - overlapping zones: highest priority wins, then the most recent entry
 //   - leaving the active zone falls back to the next zone still occupied
 //   - no zones left: neutral (ActiveZone == null)
+//   - several volumes may share one id (e.g. shade under every umbrella):
+//     the player is in that zone until they've left all of them
 // ActiveZoneChanged fires only when the active zone really changes, so
 // repeated or overlapping trigger events never produce duplicate events.
 
@@ -19,6 +21,9 @@ namespace XRPod.VR.Core
         {
             public ZoneDefinition Zone;
             public long EnteredOrder;
+            // The volumes with this id the player is inside (each volume has
+            // its own definition). The same one entering twice counts once.
+            public readonly List<ZoneDefinition> Volumes = new List<ZoneDefinition>();
         }
 
         readonly List<Occupied> _occupied = new List<Occupied>();
@@ -45,9 +50,19 @@ namespace XRPod.VR.Core
             if (zone == null) throw new ArgumentNullException(nameof(zone));
             if (zone.Environment != Environment) return ZoneInputResult.WrongEnvironment;
             if (!ZoneTrackingEnabled) return ZoneInputResult.TrackingDisabled;
-            if (IndexOf(zone.Id) >= 0) return ZoneInputResult.Duplicate;
+            var index = IndexOf(zone.Id);
+            if (index >= 0)
+            {
+                // Already in a zone with this id: remember another volume of
+                // it (not the same one twice).
+                var volumes = _occupied[index].Volumes;
+                if (!volumes.Contains(zone)) volumes.Add(zone);
+                return ZoneInputResult.Duplicate;
+            }
 
-            _occupied.Add(new Occupied { Zone = zone, EnteredOrder = _nextOrder++ });
+            var entry = new Occupied { Zone = zone, EnteredOrder = _nextOrder++ };
+            entry.Volumes.Add(zone);
+            _occupied.Add(entry);
             return UpdateActive(ZoneChangeReason.Entered);
         }
 
@@ -55,6 +70,11 @@ namespace XRPod.VR.Core
         {
             var index = IndexOf(zoneId);
             if (index < 0) return ZoneInputResult.NotInside;
+
+            // Still inside another volume with this id: no change.
+            var volumes = _occupied[index].Volumes;
+            volumes.RemoveAt(volumes.Count - 1);
+            if (volumes.Count > 0) return ZoneInputResult.NoChange;
 
             _occupied.RemoveAt(index);
             return UpdateActive(ZoneChangeReason.Exited);

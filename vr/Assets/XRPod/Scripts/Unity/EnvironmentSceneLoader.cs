@@ -152,6 +152,9 @@ namespace XRPod.VR
             rig.RotateAround(head.position, Vector3.up, yaw - head.eulerAngles.y);
             var shift = position - head.position;
             rig.position = new Vector3(rig.position.x + shift.x, position.y, rig.position.z + shift.z);
+            // A CharacterController on the rig (walking bodies) would
+            // otherwise snap back to where it was before the move.
+            Physics.SyncTransforms();
         }
 
         static Transform FindSpawnPoint(Scene scene)

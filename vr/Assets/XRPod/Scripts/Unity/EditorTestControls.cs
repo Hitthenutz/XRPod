@@ -5,6 +5,7 @@
 //   4           switch to the sponsor environment (if marked available)
 //   P           pretend the pod asked for the next environment (only
 //               when running offline, with no pod link set)
+//   Z           show or hide the coloured zone pads
 //
 // It also shows the current environment and zone in the top-left corner of
 // the Game view. The overlay isn't visible in the headset.
@@ -26,6 +27,7 @@ namespace XRPod.VR
         [SerializeField] bool showOverlay = true;
 
         int _podRequestIndex;
+        HttpPodLink _podLink;
 
         void Awake()
         {
@@ -34,6 +36,8 @@ namespace XRPod.VR
             // HUD shows "VR: not connected". (No effect on the Quest.)
             Application.runInBackground = true;
         }
+
+        void Start() => _podLink = FindAnyObjectByType<HttpPodLink>();
 
         void Update()
         {
@@ -49,6 +53,8 @@ namespace XRPod.VR
             if (keyboard.digit4Key.wasPressedThisFrame
                 && session.Environments.Request(EnvironmentId.Sponsor, "keyboard") == EnvironmentRequestResult.Unavailable)
                 Debug.Log("Sponsor environment isn't available yet (VrSystemRoot > Sponsor Available).");
+
+            if (keyboard.zKey.wasPressedThisFrame) ZoneVolume.MarkersVisible = !ZoneVolume.MarkersVisible;
 
             if (keyboard.pKey.wasPressedThisFrame)
             {
@@ -67,7 +73,8 @@ namespace XRPod.VR
 
             var zone = session.Zones.ActiveZone;
             var last = session.LastPublished;
-            GUI.Label(new Rect(10, 10, 800, 80),
+            GUI.Label(new Rect(10, 10, 800, 100),
+                $"Pod: {(_podLink == null ? "offline (no Pod Link)" : $"{_podLink.Status} {_podLink.CurrentUrl}")}\n" +
                 $"Environment: {(session.Environments.Current == EnvironmentId.None ? "waiting room" : session.Environments.Current.ToString())}\n" +
                 $"Zone: {(!session.Zones.ZoneTrackingEnabled ? "tracking off" : zone == null ? "neutral" : zone.ToString())}" +
                 $"   (inside {session.Zones.OccupiedCount})\n" +

@@ -41,6 +41,7 @@ callbacks (triggers, scene loading, HTTP) into calls on Core.
 | `IPodLink.cs` | The communication interface: receive environment requests, publish state |
 | `PodStateMessage.cs` | What Unity reports, and its JSON |
 | `InMemoryPodLink.cs` | Fake link for tests and offline Editor runs |
+| `PodAddresses.cs` | Where to look for the Pi when its address changes, and how to recognise it |
 | `VrSession.cs` | Connects all of the above for one run of the app |
 
 ## Unity
@@ -56,7 +57,9 @@ callbacks (triggers, scene loading, HTTP) into calls on Core.
 | `EditorTestControls.cs` | The Bootstrap scene | Keys 1/2/3 switch environment; on-screen status |
 | `DesktopTestMover.cs` | The desktop test player in Bootstrap | Walk with WASD and the mouse in the Editor; off while a headset is in use |
 | `Editor/XRPodSceneBuilder.cs` | (Editor menu) | **XRPod → Create Test Scenes** builds placeholder Bootstrap, Beach, Forest and Desert scenes |
-| `HttpPodLink.cs` | The Bootstrap scene (optional) | **Draft** HTTP link to the Pi, see `POD_PROTOCOL_PROPOSAL.md` |
+| `PodStatusDisplay.cs` | (created by HttpPodLink) | "Connecting / Looking for the pod..." line low in view; hides once connected |
+| `Editor/XRPodQuestSetup.cs` | (Editor menu) | **XRPod → Set Up VR Player** and **Apply Quest Settings** |
+| `HttpPodLink.cs` | The Bootstrap scene (optional) | HTTP link to the Pi (`POD_PROTOCOL_PROPOSAL.md`); finds the Pi on the Wi-Fi if its address changes |
 
 ## Zone rules
 
