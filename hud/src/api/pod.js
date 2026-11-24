@@ -31,6 +31,15 @@ export const getHistory = (limit = 50) => request(`/history?limit=${limit}`);
 // what the headset last reported (via the Pi) or null if it hasn't reported yet
 export const getVrState = () => request("/vr/state");
 
+// The headset's newest live-view picture as a Blob (a JPEG), or null when
+// there's none from the last few seconds (the Pi answers 204).
+export async function getVrFrame(signal) {
+  const res = await fetch("/api/vr/frame", { cache: "no-store", signal });
+  if (res.status === 204) return null;
+  if (!res.ok) throw new Error(`Pod server error (${res.status})`);
+  return res.blob();
+}
+
 // One shared live connection for the whole HUD. EventSource reconnects by
 // itself; `onOpen` fires on every (re)connect so callers can refetch anything
 // they missed while offline.
