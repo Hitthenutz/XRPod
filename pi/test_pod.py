@@ -6,6 +6,7 @@ Covers the safety rules (heater/AC exclusion, junk values, scent and fan
 commands and node reports), the MQTT client, settings validation and history, VR
 state reports, and the web server's protections."""
 
+import base64
 import json
 import os
 import socket
@@ -23,12 +24,19 @@ import hardware  # noqa: E402
 import mqtt  # noqa: E402
 import scent  # noqa: E402
 from store import Store, ValidationError  # noqa: E402
-from vr import STALE_SECONDS, VrState  # noqa: E402
+from vr import FRAME_STALE_SECONDS, MAX_FRAME_BYTES, STALE_SECONDS, VrFrame, VrState  # noqa: E402
 from web import EventHub, start_server  # noqa: E402
 
 GOOD_VR = {"session_id": "test1", "seq": 2, "environment": "forest",
            "zone_id": "clearing-wind", "zone_type": "windy", "zone_tracking": True,
            "reason": "zone_entered"}
+
+# Smallest thing that looks like a JPEG: start and end markers around data.
+FAKE_JPEG = b"\xff\xd8\xff\xe0" + b"picture" + b"\xff\xd9"
+
+
+def frame_msg(image=FAKE_JPEG):
+    return {"jpeg_base64": base64.b64encode(image).decode()}
 
 
 class FakeLink:
@@ -494,6 +502,29 @@ class VrStateTests(unittest.TestCase):
         self.assertEqual(state["seq"], 2)
 
 
+class VrFrameTests(unittest.TestCase):
+    def setUp(self):
+        self.clock = FakeClock()
+        self.frame = VrFrame(clock=self.clock)
+
+    def test_keeps_newest_picture_until_stale(self):
+        self.assertIsNone(self.frame.latest())
+        self.frame.update(frame_msg())
+        self.assertEqual(self.frame.latest(), FAKE_JPEG)
+        self.clock.t += FRAME_STALE_SECONDS + 0.1
+        self.assertIsNone(self.frame.latest())
+
+    def test_rejects_anything_but_a_small_jpeg(self):
+        png = b"\x89PNG\r\n\x1a\n" + b"x" * 10
+        too_big = b"\xff\xd8\xff" + b"x" * MAX_FRAME_BYTES + b"\xff\xd9"
+        for bad in [None, [], {}, {"jpeg_base64": ""}, {"jpeg_base64": 5},
+                    {"jpeg_base64": "not base64!"}, {**frame_msg(), "extra": 1},
+                    frame_msg(png), frame_msg(too_big)]:
+            with self.assertRaises(ValidationError, msg=repr(bad)[:60]):
+                self.frame.update(bad)
+        self.assertIsNone(self.frame.latest())
+
+
 class WebTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -590,6 +621,34 @@ class WebTests(unittest.TestCase):
         self.assertEqual(self.put_vr({**GOOD_VR, "pad": "x" * 10000})[0], 400)
         self.assertEqual(self.request("PUT", "/api/settings", "{}",
                                       {"Content-Type": "application/json"})[0], 405)
+
+    def put_frame(self, msg, **headers):
+        return self.request("PUT", "/api/vr/frame", json.dumps(msg),
+                            {"Content-Type": "application/json", **headers})
+
+    def test_live_view_frame_round_trip(self):
+        self.assertEqual(self.put_frame(frame_msg())[0], 200)
+        req = urllib.request.Request(self.base + "/api/vr/frame")  # noqa: S310
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
+            self.assertEqual(resp.status, 200)
+            self.assertEqual(resp.headers["Content-Type"], "image/jpeg")
+            self.assertEqual(resp.read(), FAKE_JPEG)
+
+    def test_live_view_frame_keeps_web_protections(self):
+        self.assertEqual(self.put_frame(frame_msg(), Origin="http://evil.example")[0], 403)
+        status, _ = self.request("PUT", "/api/vr/frame", FAKE_JPEG, {"Content-Type": "image/jpeg"})
+        self.assertEqual(status, 415)
+        self.assertEqual(self.put_frame({"jpeg_base64": "x" * 300_000})[0], 400)
+        self.assertEqual(self.put_frame({"jpeg_base64": "aGVsbG8="})[0], 400)  # not a JPEG
+
+    def test_no_live_view_is_204(self):
+        server = start_server(self.store, EventHub(), "127.0.0.1", 0, self.tmp.name)
+        try:
+            base = f"http://127.0.0.1:{server.server_address[1]}"
+            with urllib.request.urlopen(base + "/api/vr/frame", timeout=5) as resp:  # noqa: S310
+                self.assertEqual(resp.status, 204)
+        finally:
+            server.shutdown()
 
     def test_read_endpoints(self):
         self.assertEqual(self.request("GET", "/api/settings")[0], 200)

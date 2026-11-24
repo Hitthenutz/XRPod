@@ -12,8 +12,14 @@ logic can read latest() and decide what to do.
 
 Message format: Maryam's "Proposal: how the Pi and the VR app talk"
 (vr/docs/POD_PROTOCOL_PROPOSAL.md).
+
+Live view: the headset also sends a small JPEG of what the user sees, a few
+times a second (PUT /api/vr/frame). Only the newest picture is kept, in
+memory, for the HUD to show (GET /api/vr/frame). It is never saved.
 """
 
+import base64
+import binascii
 import threading
 import time
 
@@ -123,3 +129,58 @@ class VrState:
             return None
         age = max(0.0, self._clock() - self._received_at)
         return {**self._state, "age_s": round(age, 1), "connected": age <= STALE_SECONDS}
+
+
+# ------------------------------------------------------------- live view
+
+# A 640 x 360 JPEG at the headset's quality is ~20-60 KB; this leaves room.
+MAX_FRAME_BYTES = 150 * 1024
+# Base64 makes it a third bigger, plus the JSON around it.
+MAX_FRAME_BODY_BYTES = 256 * 1024
+# The HUD stops showing a picture this long after the last one.
+FRAME_STALE_SECONDS = 3
+
+
+def decode_frame(msg):
+    """Return the JPEG bytes in a {"jpeg_base64": "..."} message, or raise
+    ValidationError. Only a real JPEG within MAX_FRAME_BYTES is accepted."""
+    if not isinstance(msg, dict) or set(msg) != {"jpeg_base64"}:
+        raise ValidationError('body must be {"jpeg_base64": "..."}')
+    text = msg["jpeg_base64"]
+    if not isinstance(text, str) or not text:
+        raise ValidationError("jpeg_base64 must be base64 text")
+    try:
+        image = base64.b64decode(text, validate=True)
+    except (binascii.Error, ValueError) as err:
+        raise ValidationError("jpeg_base64 must be base64 text") from err
+    if len(image) > MAX_FRAME_BYTES:
+        raise ValidationError(f"picture too large (over {MAX_FRAME_BYTES // 1024} KB)")
+    # A JPEG starts with FF D8 FF and ends with FF D9.
+    if not (image.startswith(b"\xff\xd8\xff") and image.endswith(b"\xff\xd9")):
+        raise ValidationError("picture must be a JPEG")
+    return image
+
+
+class VrFrame:
+    """Thread-safe holder for the newest live-view picture."""
+
+    def __init__(self, clock=time.monotonic):
+        self._lock = threading.Lock()
+        self._clock = clock
+        self._image = None
+        self._received_at = None
+
+    def update(self, msg):
+        """Validate and keep the picture in `msg` (see decode_frame)."""
+        image = decode_frame(msg)
+        with self._lock:
+            self._image = image
+            self._received_at = self._clock()
+
+    def latest(self):
+        """The newest JPEG, or None if there's none from the last
+        FRAME_STALE_SECONDS (the headset stopped sending or is off)."""
+        with self._lock:
+            if self._image is None or self._clock() - self._received_at > FRAME_STALE_SECONDS:
+                return None
+            return self._image

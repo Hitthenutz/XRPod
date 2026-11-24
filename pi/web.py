@@ -8,7 +8,10 @@ API (all JSON):
   GET   /api/history?limit=50  newest settings changes first
   GET   /api/vr/state          what the headset last reported (or null)
   PUT   /api/vr/state          headset reports its environment and zone
-  GET   /api/events            Server-Sent Events stream: "settings",
+  PUT   /api/vr/frame          headset sends its live view: {"jpeg_base64": "..."}
+  GET   /api/vr/frame          the newest live-view picture (image/jpeg), or
+                               204 No Content if there's none from the last 3 s
+  GET   /api/events          Server-Sent Events stream: "settings",
                                "reading", "history" and "vr" events, live
 
 Everything else serves the built HUD from ../hud/dist (run `npm run build` in hud/).
@@ -31,7 +34,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from store import ValidationError
-from vr import VrState
+from vr import MAX_FRAME_BODY_BYTES, VrFrame, VrState
 
 log = logging.getLogger("xrpod.web")
 
@@ -108,9 +111,10 @@ class Handler(BaseHTTPRequestHandler):
             return True
         return urlsplit(origin).netloc == self.headers.get("Host")
 
-    def _read_json_body(self):
+    def _read_json_body(self, max_bytes=MAX_BODY_BYTES):
         """Apply the write protections and return the parsed body, or send
-        the error and return None."""
+        the error and return None. Only the live-view picture may be bigger
+        than MAX_BODY_BYTES."""
         if not self._same_origin():
             self._error(HTTPStatus.FORBIDDEN, "cross-origin request blocked")
             return None
@@ -121,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = -1
-        if not 0 < length <= MAX_BODY_BYTES:
+        if not 0 < length <= max_bytes:
             self._error(HTTPStatus.BAD_REQUEST, "body missing or too large")
             return None
         try:
@@ -145,6 +149,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(HTTPStatus.OK, self.server.pod_store.get_history(limit))
         if url.path == "/api/vr/state":
             return self._send_json(HTTPStatus.OK, self.server.pod_vr.latest())
+        if url.path == "/api/vr/frame":
+            return self._send_frame()
         if url.path == "/api/events":
             return self._stream_events()
         if url.path.startswith("/api/"):
@@ -170,7 +176,10 @@ class Handler(BaseHTTPRequestHandler):
         return self._send_json(HTTPStatus.OK, settings)
 
     def do_PUT(self):  # noqa: N802
-        if urlsplit(self.path).path != "/api/vr/state":
+        path = urlsplit(self.path).path
+        if path == "/api/vr/frame":
+            return self._put_frame()
+        if path != "/api/vr/state":
             return self._error(HTTPStatus.METHOD_NOT_ALLOWED, "use PATCH /api/settings")
         msg = self._read_json_body()
         if msg is None:
@@ -182,6 +191,35 @@ class Handler(BaseHTTPRequestHandler):
         if changed:
             self.server.pod_hub.publish("vr", state)
         return self._send_json(HTTPStatus.OK, state)
+
+    # --------------------------------------------------------- live view
+    def _put_frame(self):
+        msg = self._read_json_body(MAX_FRAME_BODY_BYTES)
+        if msg is None:
+            return None
+        try:
+            self.server.pod_vr_frame.update(msg)
+        except ValidationError as err:
+            return self._error(HTTPStatus.BAD_REQUEST, str(err))
+        # Not published over /api/events: pictures are too big for it. The
+        # HUD fetches GET /api/vr/frame a few times a second instead.
+        return self._send_json(HTTPStatus.OK, {"ok": True})
+
+    def _send_frame(self):
+        image = self.server.pod_vr_frame.latest()
+        if image is None:
+            self.send_response(HTTPStatus.NO_CONTENT)
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(image)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(image)
 
     def do_POST(self):  # noqa: N802
         self._error(HTTPStatus.METHOD_NOT_ALLOWED, "use PATCH /api/settings")
@@ -242,12 +280,13 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def start_server(store, hub, host, port, static_dir, on_settings_changed=lambda: None, vr=None):
+def start_server(store, hub, host, port, static_dir, on_settings_changed=lambda: None, vr=None, vr_frame=None):
     server = ThreadingHTTPServer((host, port), Handler)
     server.daemon_threads = True
     server.pod_store = store
     server.pod_hub = hub
     server.pod_vr = vr if vr is not None else VrState()
+    server.pod_vr_frame = vr_frame if vr_frame is not None else VrFrame()
     server.pod_static_root = Path(static_dir).resolve()
     server.pod_on_settings_changed = on_settings_changed
     thread = threading.Thread(target=server.serve_forever, name="web", daemon=True)
