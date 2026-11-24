@@ -60,11 +60,13 @@ after about a minute of clean air).
 
 ## 4. Send readings to the Pi
 
-1. Copy `include/secrets.example.h` to `include/secrets.h` (git-ignored,
-   never committed).
-2. Fill in the Pi hotspot's Wi-Fi name and password, and the MQTT login.
-   Same values as the scent and fan nodes use.
-3. Upload again. You should see `[net] ... MQTT 10.42.0.1:1883 ... connected`.
+On a laptop that already flashes the scent node there's nothing to do: when
+this folder has no `include/secrets.h`, the node uses
+`esp32/scent-node/include/secrets.h` (same Pi, same login). Otherwise copy
+`include/secrets.example.h` to `include/secrets.h` (git-ignored, never
+committed) and fill in the Pi hotspot's Wi-Fi and the MQTT login.
+
+Upload again. You should see `[net] ... MQTT 10.42.0.1:1883 ... connected`.
 4. On the Pi, check it arrives:
    `mosquitto_sub -h localhost -t 'xrpod/iaq/#' -v -u <user> -P <password>`
 

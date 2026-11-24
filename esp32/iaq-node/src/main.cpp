@@ -26,8 +26,14 @@
 #include "IaqSensor.h"
 #include "config.h"
 
+// The Wi-Fi and MQTT login: this node's own include/secrets.h, or else the
+// scent node's (same Pi, same login), so a laptop that already flashes the
+// scent node needs nothing extra.
 #if __has_include("secrets.h")
 #include "secrets.h"
+#define HAVE_SECRETS 1
+#elif __has_include("../../scent-node/include/secrets.h")
+#include "../../scent-node/include/secrets.h"
 #define HAVE_SECRETS 1
 #else
 #include "secrets.example.h"
