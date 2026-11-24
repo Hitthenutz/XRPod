@@ -7,7 +7,7 @@
 #define WIFI_PASSWORD "your-wifi-password"
 
 // Raspberry Pi 5 MQTT broker (Mosquitto) on the pod network
-// Use the Pi's IP; ".local" names may not resolve on the ESP32
+// The Pi's IP ("192.168.1.42"), or its name if it's called xrpod: "xrpod.local"
 #define MQTT_HOST     "192.168.1.100"
 #define MQTT_PORT     1883
 

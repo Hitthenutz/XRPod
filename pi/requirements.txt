@@ -1,0 +1,6 @@
+# Extra packages for the AI supervisor (ml_inference.py).
+# The rest of the Pi code uses only the standard library.
+# The agent still runs without these; the AI card just shows UNKNOWN.
+pandas
+joblib
+scikit-learn

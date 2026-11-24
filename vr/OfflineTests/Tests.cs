@@ -103,6 +103,21 @@ namespace XRPod.VR.OfflineTests
                 Equal(1, h.Zones.OccupiedCount, "occupied");
             }),
 
+            new TestCase("zone with one id in several places: in it until you've left them all", () =>
+            {
+                // Shade under every umbrella shares the id beach-umbrella-shade.
+                var h = new Harness(EnvironmentId.Beach);
+                var shadeA = new ZoneDefinition("beach-umbrella-shade", ZoneType.Cool, EnvironmentId.Beach, 15);
+                var shadeB = new ZoneDefinition("beach-umbrella-shade", ZoneType.Cool, EnvironmentId.Beach, 15);
+                h.Zones.Enter(shadeA);
+                h.Zones.Enter(shadeB); // the two umbrellas' shade overlaps
+                Equal(ZoneInputResult.NoChange, h.Zones.Exit("beach-umbrella-shade"), "left the first");
+                Equal("beach-umbrella-shade", h.Zones.ActiveZone?.Id, "still in shade");
+                Equal(ZoneInputResult.Changed, h.Zones.Exit("beach-umbrella-shade"), "left the second");
+                Equal(null, h.Zones.ActiveZone, "out of the shade");
+                Equal(2, h.ZoneEvents.Count, "one enter and one exit event");
+            }),
+
             new TestCase("leaving a zone you're not in is ignored", () =>
             {
                 var h = new Harness();
@@ -336,6 +351,38 @@ namespace XRPod.VR.OfflineTests
                 h.Link.SimulateEnvironmentRequest("forest");
                 h.Link.SimulateEnvironmentRequest("sponsor");
                 Equal(2, h.Diagnostics.Count, "logged again after a good request");
+            }),
+
+            // --------------------------------------- finding the Pi
+            new TestCase("pod addresses: set one first, then last working, then usual names", () =>
+            {
+                var list = PodAddresses.Candidates("http://10.0.0.5/", "10.0.0.9", null);
+                Equal("http://10.0.0.5", list[0], "configured");
+                Equal("http://10.0.0.9", list[1], "last working");
+                Equal("http://xrpod.local", list[2], "name");
+                Equal("http://10.42.0.1", list[3], "Pi hotspot");
+                Equal(4, list.Count, "no network scan without a local address");
+                Equal(3, PodAddresses.Candidates("http://x", "http://x/", null).Count, "duplicates dropped");
+            }),
+
+            new TestCase("pod addresses: scans the headset's own network, skipping itself", () =>
+            {
+                var list = PodAddresses.Candidates("http://localhost:8080", null, "10.199.194.57");
+                Contains(string.Join(" ", list), "http://10.199.194.129", "the Pi's address");
+                Equal(false, list.Contains("http://10.199.194.57"), "not the headset itself");
+                Equal(3 + 253, list.Count, "3 fixed + 253 on the network");
+                foreach (var bad in new[] { "garbage", "127.0.0.1", "169.254.3.4", "300.1.1.1", "" })
+                    Equal(3, PodAddresses.Candidates("http://localhost:8080", null, bad).Count, bad);
+            }),
+
+            new TestCase("pod addresses: tidy up typed addresses and recognise the Pi", () =>
+            {
+                Equal("http://10.199.194.129", PodAddresses.Normalize(" 10.199.194.129/ "), "bare IP");
+                Equal("http://xrpod.local:8080", PodAddresses.Normalize("http://xrpod.local:8080/"), "with port");
+                Equal(null, PodAddresses.Normalize("  "), "empty");
+                Equal(true, PodAddresses.IsPodServer("XRPod Python/3.12.10"), "the Pi");
+                Equal(false, PodAddresses.IsPodServer("nginx"), "something else");
+                Equal(false, PodAddresses.IsPodServer(null), "no header");
             }),
 
             new TestCase("message JSON matches the proposed format", () =>

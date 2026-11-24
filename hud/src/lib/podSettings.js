@@ -1,4 +1,5 @@
 export const SCENTS = ["none", "lavender", "pine", "citrus", "ocean", "rain"];
+export const FAN_LEVELS = [0, 25, 50, 75, 100];
 // Mirror CONTROL_MODES and ENVIRONMENTS in pi/store.py.
 export const CONTROL_MODES = ["manual", "auto"];
 export const ENVIRONMENTS = ["none", "beach", "forest", "desert", "sponsor"];

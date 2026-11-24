@@ -2,8 +2,9 @@
 XRPod hardware: sensors and actuators on the Raspberry Pi.
 
 Everything here is a STUB until you fill in the TODO(hardware) parts, so the
-whole system runs on a laptop for testing. scent.py (the scent machine) is
-already wired up; set SCENT_HARDWARE=gpio to drive its real pins.
+whole system runs on a laptop for testing. scent.py and fan.py talk to the
+ESP32 scent and fan nodes over MQTT; set SCENT_HARDWARE=mqtt and
+FAN_HARDWARE=mqtt on the Pi to use them.
 
 Safety rules this module enforces no matter what the HUD asks for:
   * the heater and AC never run at the same time,
@@ -14,6 +15,7 @@ Safety rules this module enforces no matter what the HUD asks for:
 import logging
 import random
 
+from fan import FanController
 from scent import ScentController
 
 log = logging.getLogger("xrpod.hardware")
@@ -25,6 +27,8 @@ state = {
     "fan_pct": 0,
 }
 scent_machine = None  # ScentController, created in setup()
+
+fan_node = None  # FanController, created in setup()
 
 
 def setup():
@@ -39,9 +43,10 @@ def setup():
         fan_pwm = GPIO.PWM(FAN_PWM_PIN, 25_000); fan_pwm.start(0)
         dht = adafruit_dht.DHT22(board.D4)
     """
-    global scent_machine
-    log.info("hardware: using STUBS for heater/AC/fan/sensors")
+    global scent_machine, fan_node
+    log.info("hardware: using STUBS for heater/AC/sensors")
     scent_machine = ScentController()
+    fan_node = FanController()
 
 
 def cleanup():
@@ -51,10 +56,24 @@ def cleanup():
     """
     set_heater_relay(False)
     set_ac_relay(False)
-    set_fan_pwm(0)
+    state["fan_pct"] = 0
+    if fan_node:
+        fan_node.close()
     if scent_machine:
         scent_machine.close()
     log.info("hardware: all outputs off")
+
+
+def take_node_errors():
+    """Errors the ESP32 nodes reported since the last call, as
+    [(source, message)], for the data log. Each is returned once."""
+    errors = []
+    for source, node in (("scent", scent_machine), ("fan", fan_node)):
+        message = getattr(node, "last_error", None)
+        if message:
+            node.last_error = None
+            errors.append((source, message))
+    return errors
 
 
 # --------------------------------------------------------------------------
@@ -71,15 +90,23 @@ def read_sensors():
     fake_humidity = 45.0 + random.uniform(-3, 3)  # noqa: S311
     fake_rpm = state["fan_pct"] * 30 + random.uniform(-20, 20) if state["fan_pct"] else 0  # noqa: S311
 
+    # The BME688 (IAQ node, xrpod/iaq/reading) replaces the fake temperature
+    # and humidity whenever it has sent a fresh reading.
+    scent = scent_machine.status() if scent_machine else {"scent_active": "none"}
+    iaq = scent.get("iaq") or {}
+    temp_c, humidity = iaq.get("temp_c"), iaq.get("humidity_pct")
+    real = temp_c is not None and humidity is not None
+    temp_f = temp_c * 9 / 5 + 32 if real else fake_temp_f
+
     return {
-        "actual_temp_f": round(fake_temp_f, 1),
-        "actual_humidity_pct": round(fake_humidity, 1),
+        "actual_temp_f": round(temp_f, 1),
+        "actual_humidity_pct": round(humidity if real else fake_humidity, 1),
+        "climate_source": "bme688" if real else "simulated",
         "ac_running": state["ac_running"],
         "heater_running": state["heater_running"],
-        "fan_rpm": max(0, round(fake_rpm)),
-        "scent_active": scent_machine.active if scent_machine else "none",
+        **(fan_node.status(max(0, round(fake_rpm))) if fan_node else {"fan_rpm": 0}),
+        **scent,
     }
-
 
 # --------------------------------------------------------------------------
 # Actuators (STUB)
@@ -95,8 +122,10 @@ def set_ac_relay(on):
 
 
 def set_fan_pwm(pct):
-    # TODO(hardware): fan_pwm.ChangeDutyCycle(pct)
+    """Send the fan speed to the fan node (fan.py resends it every few
+    seconds so the node doesn't time out and turn the fans off)."""
     state["fan_pct"] = pct
+    fan_node.set_speed(pct)
 
 
 def to_pct(value):

@@ -1,5 +1,6 @@
 // Wi-Fi + MQTT connection to the Raspberry Pi broker, with retry and a
 // last-will "offline" message so the Pi knows when the node drops.
+// MQTT_HOST can be an IP ("192.168.1.42") or an mDNS name ("xrpod.local").
 #pragma once
 
 #include <PubSubClient.h>
@@ -32,16 +33,27 @@ class MqttLink {
   // True once right after each successful (re)connect.
   bool takeJustConnected();
 
+  // Wi-Fi, broker and MQTT state in plain words (bench "net" command).
+  void printNetStatus();
+  // PubSubClient state code -> what it usually means.
+  static const char *stateText(int rc);
+
  private:
   void tryConnect();
+  bool resolveBroker();
 
   WiFiClient wifi_;
   PubSubClient mqtt_;
   Settings s_{};
   MessageHandler handler_ = nullptr;
   char clientId_[32] = {};
+  IPAddress brokerIp_;
+  bool useMdns_ = false;
+  bool mdnsStarted_ = false;
   bool started_ = false;
+  bool wifiWasUp_ = false;
   bool justConnected_ = false;
+  int lastRc_ = MQTT_DISCONNECTED;
   uint32_t nextWifiMs_ = 0;
   uint32_t nextMqttMs_ = 0;
 };

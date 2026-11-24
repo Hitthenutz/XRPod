@@ -1,11 +1,19 @@
 {
   "folders": [
-    { "name": "scent-node (ESP32)", "path": "scent-node" },
-    { "name": "XRPod repo", "path": ".." }
+    {
+      "name": "scent-node (ESP32)",
+      "path": "scent-node"
+    },
+    {
+      "name": "XRPod repo",
+      "path": ".."
+    }
   ],
   "settings": {
     "git.openRepositoryInParentFolders": "always",
-    "files.exclude": { "**/.pio": true }
+    "files.exclude": {
+      "**/.pio": true
+    }
   },
   "extensions": {
     "recommendations": [
@@ -13,6 +21,32 @@
       "ms-vscode.cpptools",
       "github.vscode-pull-request-github",
       "eamodio.gitlens"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "XRPod: diagnose ESP32 USB",
+        "type": "process",
+        "command": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${workspaceFolder:XRPod repo}/esp32/scent-node/tools/diag-usb.ps1"
+        ],
+        "options": {
+          "cwd": "${workspaceFolder:XRPod repo}"
+        },
+        "problemMatcher": [],
+        "presentation": {
+          "reveal": "always",
+          "panel": "dedicated",
+          "clear": true
+        }
+      }
     ]
   }
 }

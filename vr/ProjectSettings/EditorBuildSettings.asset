@@ -23,5 +23,16 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/XRPod/Scenes/SponsorComingSoon.unity
     guid: ff18243657acaee4c806a7000b1629e4
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Beach_v1.unity
+    guid: 43ca8ac973249144c856ce3cf4759fad
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Forest_v1.unity
+    guid: 2bbec3570d06685429ef817c65c8d142
+  - enabled: 1
+    path: Assets/XRPod/Scenes/Desert_v1.unity
+    guid: 2d44ccd755f82684785fd3182e25111d
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: e931b487d4e967a418ac564eba7bdb84, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: 25348aa1671bd3b49a33ab8db46e8c44, type: 2}

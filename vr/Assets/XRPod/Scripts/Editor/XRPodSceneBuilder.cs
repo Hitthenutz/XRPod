@@ -21,7 +21,9 @@
 //
 // The worlds are stand-ins for testing switching and zones. Replace the
 // shapes with real art later and keep (or move) the zone objects. Running it
-// again replaces every scene except Bootstrap, after asking.
+// again replaces these test scenes (not Bootstrap), after asking. It never
+// touches the real "v1" worlds (XRPodWorldSetup) or the loader's choice of
+// them.
 
 using System.Collections.Generic;
 using System.IO;
@@ -39,6 +41,11 @@ namespace XRPod.VR
     {
         const string SceneFolder = "Assets/XRPod/Scenes";
         const string MaterialFolder = "Assets/XRPod/Materials";
+        // Real 360 photos and photo-scanned floors per world (CC0, Poly Haven;
+        // see vr/THIRD_PARTY_NOTICES.md). A world without its files keeps the
+        // plain placeholder look.
+        const string EnvironmentFolder = "Assets/XRPod/Environments";
+        const float GroundMetres = 300f;
         // Bootstrap first: it's the scene the app starts with.
         static readonly string[] SceneNames = { "Bootstrap", "WaitingRoom", "Beach", "Forest", "Desert", "SponsorComingSoon" };
 
@@ -62,9 +69,9 @@ namespace XRPod.VR
                 Priority = priority;
             }
 
-            // The whole 100 x 100 m world, lowest priority: what it feels
-            // like anywhere outside the other zones.
-            public static Zone Base(string id, ZoneType type) => new Zone(id, type, 0f, 0f, 100f, 100f, 0);
+            // The whole world (as big as the ground), lowest priority: what
+            // it feels like anywhere outside the other zones.
+            public static Zone Base(string id, ZoneType type) => new Zone(id, type, 0f, 0f, GroundMetres, GroundMetres, 0);
 
             public bool IsBase => Priority == 0;
         }
@@ -100,9 +107,13 @@ namespace XRPod.VR
             BuildSponsorComingSoon();
             AssetDatabase.SaveAssets();
 
+            // Our scenes first (Bootstrap must be first), then any others
+            // already in the list, e.g. the hand-made v1 worlds.
             var buildScenes = new List<EditorBuildSettingsScene>();
             foreach (var name in SceneNames)
                 buildScenes.Add(new EditorBuildSettingsScene(ScenePath(name), true));
+            foreach (var other in EditorBuildSettings.scenes)
+                if (!buildScenes.Exists(s => s.path == other.path)) buildScenes.Add(other);
             EditorBuildSettings.scenes = buildScenes.ToArray();
 
             EditorSceneManager.OpenScene(ScenePath("Bootstrap"));
@@ -213,8 +224,7 @@ namespace XRPod.VR
             Dreamy();
 
             var decoration = new GameObject("Decoration").transform;
-            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
-                decoration, "Waiting platform", new Color(0.82f, 0.76f, 0.98f));
+            Platform(decoration, "Waiting platform", new Color(0.82f, 0.76f, 0.98f));
             FloatingShapes(decoration,
                 new Color(1f, 0.72f, 0.82f), new Color(0.72f, 0.85f, 1f),
                 new Color(0.8f, 1f, 0.85f), new Color(1f, 0.93f, 0.7f));
@@ -237,8 +247,7 @@ namespace XRPod.VR
             Dreamy();
 
             var decoration = new GameObject("Decoration").transform;
-            Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f), new Vector3(5f, 0.02f, 5f),
-                decoration, "Sponsor platform", new Color(0.62f, 0.86f, 0.86f));
+            Platform(decoration, "Sponsor platform", new Color(0.62f, 0.86f, 0.86f));
             FloatingShapes(decoration,
                 new Color(0.35f, 0.75f, 0.78f), new Color(1f, 0.8f, 0.35f),
                 new Color(0.55f, 0.88f, 0.8f), new Color(1f, 0.9f, 0.6f));
@@ -256,13 +265,19 @@ namespace XRPod.VR
                 horizon: new Color(0.78f, 0.87f, 0.95f),
                 sun: new Color(1f, 0.96f, 0.85f), sunIntensity: 1.3f, sunAngles: new Vector3(50f, -30f, 0f));
 
+            var photo = PhotoLook("Beach", "secluded_beach", "aerial_beach_01");
             var scenery = new GameObject("Scenery").transform;
-            Shape(PrimitiveType.Cube, "Sea", new Vector3(0f, 0.005f, 37.5f), new Vector3(100f, 0.01f, 25f),
-                scenery, "Water", new Color(0.1f, 0.45f, 0.75f), smoothness: 0.9f);
-            Palm(scenery, -12f, 14f);
-            Palm(scenery, 15f, 18f);
-            Palm(scenery, -5f, -10f);
-            Palm(scenery, 20f, -4f);
+            // With the photo the cove, water and rocks are all in the photo;
+            // only the placeholder look needs shapes.
+            if (!photo)
+            {
+                Shape(PrimitiveType.Cube, "Sea", new Vector3(0f, 0.005f, 37.5f), new Vector3(100f, 0.01f, 25f),
+                    scenery, "Water", new Color(0.1f, 0.45f, 0.75f), smoothness: 0.9f);
+                Palm(scenery, -12f, 14f);
+                Palm(scenery, 15f, 18f);
+                Palm(scenery, -5f, -10f);
+                Palm(scenery, 20f, -4f);
+            }
 
             // Walking towards the sea: open sand -> shore -> waterline, each
             // ring windier, more humid and saltier.
@@ -283,21 +298,25 @@ namespace XRPod.VR
                 horizon: new Color(0.62f, 0.72f, 0.66f),
                 sun: new Color(1f, 0.95f, 0.85f), sunIntensity: 1f, sunAngles: new Vector3(45f, 40f, 0f));
 
+            var photo = PhotoLook("Forest", "mossy_forest", "forest_leaves_02");
             var scenery = new GameObject("Scenery").transform;
-            Shape(PrimitiveType.Cube, "Stream", new Vector3(12f, 0.005f, 5f), new Vector3(1.5f, 0.01f, 70f),
-                scenery, "Water", new Color(0.1f, 0.45f, 0.75f), smoothness: 0.9f);
-            var trees = new[]
+            if (!photo)
             {
-                new Vector2(-20f, -5f), new Vector2(-18f, 12f), new Vector2(-25f, 25f), new Vector2(-6f, 28f),
-                new Vector2(8f, 30f), new Vector2(22f, 24f), new Vector2(24f, 10f), new Vector2(20f, -12f),
-                new Vector2(-10f, -18f), new Vector2(6f, -20f), new Vector2(-30f, 5f), new Vector2(30f, 0f),
-                new Vector2(0f, 40f), new Vector2(-15f, 38f), new Vector2(15f, 40f),
-            };
-            foreach (var spot in trees) Tree(scenery, spot.x, spot.y);
-            Shape(PrimitiveType.Sphere, "Rain cloud", new Vector3(-15f, 7f, 20f), new Vector3(16f, 2.5f, 16f),
-                scenery, "Rain cloud", new Color(0.55f, 0.57f, 0.6f));
-            Shape(PrimitiveType.Sphere, "Rain cloud (heavy)", new Vector3(-15f, 6f, 20f), new Vector3(9f, 2.5f, 9f),
-                scenery, "Rain cloud heavy", new Color(0.3f, 0.32f, 0.36f));
+                Shape(PrimitiveType.Cube, "Stream", new Vector3(12f, 0.005f, 5f), new Vector3(1.5f, 0.01f, 70f),
+                    scenery, "Water", new Color(0.1f, 0.45f, 0.75f), smoothness: 0.9f);
+                var trees = new[]
+                {
+                    new Vector2(-20f, -5f), new Vector2(-18f, 12f), new Vector2(-25f, 25f), new Vector2(-6f, 28f),
+                    new Vector2(8f, 30f), new Vector2(22f, 24f), new Vector2(24f, 10f), new Vector2(20f, -12f),
+                    new Vector2(-10f, -18f), new Vector2(6f, -20f), new Vector2(-30f, 5f), new Vector2(30f, 0f),
+                    new Vector2(0f, 40f), new Vector2(-15f, 38f), new Vector2(15f, 40f),
+                };
+                foreach (var spot in trees) Tree(scenery, spot.x, spot.y);
+            }
+            // Falling rain over the rainy zones: light at the edge, heavy in
+            // the middle (both fall there).
+            Rain(scenery, "Rain", new Vector3(-15f, 0f, 20f), new Vector2(16f, 16f), 3f);
+            Rain(scenery, "Rain (heavy)", new Vector3(-15f, 0f, 20f), new Vector2(8f, 8f), 10f);
 
             // The rain gets heavier towards the middle of the rainy area.
             AddZones(EnvironmentId.Forest,
@@ -317,18 +336,25 @@ namespace XRPod.VR
                 horizon: new Color(0.95f, 0.82f, 0.62f),
                 sun: new Color(1f, 0.88f, 0.7f), sunIntensity: 1.5f, sunAngles: new Vector3(60f, -20f, 0f));
 
+            var photo = PhotoLook("Desert", "goegap", "gravelly_sand");
             var scenery = new GameObject("Scenery").transform;
-            var rock = new Color(0.6f, 0.42f, 0.3f);
-            // A small cave, open towards the start point: shade at its mouth,
-            // cooler still inside.
-            Shape(PrimitiveType.Cube, "Cave left wall", new Vector3(-3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Cube, "Cave right wall", new Vector3(3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Cube, "Cave back wall", new Vector3(0f, 1.5f, 25.2f), new Vector3(6.8f, 3f, 0.4f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Cube, "Cave roof", new Vector3(0f, 3.1f, 22f), new Vector3(6.8f, 0.2f, 6.8f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Sphere, "Rock", new Vector3(-14f, 0.8f, 32f), new Vector3(4f, 2.5f, 3f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Sphere, "Rock", new Vector3(18f, 0.8f, 30f), new Vector3(5f, 3f, 4f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Sphere, "Rock", new Vector3(25f, 0.6f, -8f), new Vector3(3f, 2f, 3f), scenery, "Rock", rock);
-            Shape(PrimitiveType.Sphere, "Rock", new Vector3(-22f, 0.6f, -15f), new Vector3(3.5f, 2f, 2.5f), scenery, "Rock", rock);
+            // The placeholder look's cave and rocks. With the photo they'd look
+            // out of place; the shade zones stay (invisible) until real rock
+            // models give them something to be in the shade of.
+            if (!photo)
+            {
+                var rock = new Color(0.6f, 0.42f, 0.3f);
+                // A small cave, open towards the start point: shade at its
+                // mouth, cooler still inside.
+                Shape(PrimitiveType.Cube, "Cave left wall", new Vector3(-3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Cube, "Cave right wall", new Vector3(3.2f, 1.5f, 22f), new Vector3(0.4f, 3f, 6.8f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Cube, "Cave back wall", new Vector3(0f, 1.5f, 25.2f), new Vector3(6.8f, 3f, 0.4f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Cube, "Cave roof", new Vector3(0f, 3.1f, 22f), new Vector3(6.8f, 0.2f, 6.8f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Sphere, "Rock", new Vector3(-14f, 0.8f, 32f), new Vector3(4f, 2.5f, 3f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Sphere, "Rock", new Vector3(18f, 0.8f, 30f), new Vector3(5f, 3f, 4f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Sphere, "Rock", new Vector3(25f, 0.6f, -8f), new Vector3(3f, 2f, 3f), scenery, "Rock", rock);
+                Shape(PrimitiveType.Sphere, "Rock", new Vector3(-22f, 0.6f, -15f), new Vector3(3.5f, 2f, 2.5f), scenery, "Rock", rock);
+            }
 
             AddZones(EnvironmentId.Desert,
                 Zone.Base("desert-open", ZoneType.Hot),
@@ -355,7 +381,7 @@ namespace XRPod.VR
 
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.name = "Ground";
-            floor.transform.localScale = new Vector3(10f, 1f, 10f); // 100 x 100 m
+            floor.transform.localScale = new Vector3(GroundMetres / 10f, 1f, GroundMetres / 10f); // a Plane is 10 m
             Paint(floor, name + " ground", ground, 0.1f);
 
             // Where the user appears when this world loads (facing +z).
@@ -379,6 +405,169 @@ namespace XRPod.VR
             RenderSettings.fogStartDistance = 30f;
             RenderSettings.fogEndDistance = 150f;
             return scene;
+        }
+
+        // The real look for a world, if its files are in Environments/<world>/:
+        // the 360 photo as the sky, the photo-scanned floor, and ambient light
+        // and fog taken from the photo's own colours so everything matches.
+        // Returns false (placeholder look kept) if the files aren't there.
+        static bool PhotoLook(string world, string sky, string floor, float tileMetres = 4f)
+        {
+            var folder = $"{EnvironmentFolder}/{world}";
+            var skyPath = $"{folder}/{sky}_sky_4k.jpg";
+            string Find(string part)
+            {
+                if (!Directory.Exists(folder)) return null;
+                foreach (var file in Directory.GetFiles(folder, floor + "_*"))
+                    if (Path.GetFileName(file).Contains(part) && !file.EndsWith(".meta")) return file.Replace('\\', '/');
+                return null;
+            }
+            var colorPath = Find("_diff");
+            var normalPath = Find("_nor_gl");
+            var smoothPath = Find("_metal_smooth");
+            if (!File.Exists(skyPath) || colorPath == null || normalPath == null || smoothPath == null)
+            {
+                Debug.LogWarning($"[XRPod] {world}: photo files missing in {folder}; using the placeholder look.");
+                return false;
+            }
+
+            // The sky. Unity puts the photo's centre to the side; 90 turns it
+            // to face the start spot (+z), where each photo's main view is
+            // (the cove, the path, the hills). Checked in the Editor: 270
+            // showed the beach photo's back (the trees).
+            // The photo's own ground is projected onto the floor (our ground
+            // projected sky shader), so the user stands inside the photo.
+            // If that shader can't be used, a plain panoramic sky over our
+            // textured floor instead.
+            var projected = Shader.Find("XRPod/Ground Projected Skybox");
+            var useProjected = projected != null && !ShaderUtil.ShaderHasError(projected);
+            var skybox = MaterialAsset(world + " photo sky", useProjected ? projected.name : "Skybox/Panoramic");
+            skybox.SetTexture("_MainTex", ImportTexture(skyPath, sky: true));
+            skybox.SetFloat("_Rotation", 90f);
+            skybox.SetFloat("_Exposure", 1f);
+            if (useProjected)
+            {
+                skybox.SetFloat("_CameraHeight", 1.7f); // typical for these photos
+                skybox.SetFloat("_Radius", 60f);
+            }
+            else
+            {
+                Debug.LogWarning("[XRPod] Ground Projected Skybox shader not usable; using a plain panoramic sky.");
+                skybox.SetFloat("_Mapping", 1f); // latitude-longitude (a 360 photo)
+                skybox.EnableKeyword("_MAPPING_LATITUDE_LONGITUDE_LAYOUT");
+                skybox.SetFloat("_ImageType", 0f); // 360 degrees
+            }
+            RenderSettings.skybox = skybox;
+
+            // The floor, tiled every few metres.
+            var ground = MaterialAsset(world + " photo ground", "Universal Render Pipeline/Lit");
+            ground.SetTexture("_BaseMap", ImportTexture(colorPath));
+            ground.SetColor("_BaseColor", Color.white);
+            ground.SetTexture("_BumpMap", ImportTexture(normalPath, normalMap: true));
+            ground.EnableKeyword("_NORMALMAP");
+            ground.SetTexture("_MetallicGlossMap", ImportTexture(smoothPath, linear: true));
+            ground.EnableKeyword("_METALLICSPECGLOSSMAP");
+            ground.SetFloat("_Smoothness", 1f); // the map holds the real smoothness
+            ground.SetTextureScale("_BaseMap", Vector2.one * (GroundMetres / tileMetres));
+            foreach (var root in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                if (root.name != "Ground") continue;
+                root.GetComponent<Renderer>().sharedMaterial = ground;
+                // With the photo's own ground showing, the floor stays only as
+                // something to stand on (its collider): not drawn.
+                root.GetComponent<Renderer>().enabled = !useProjected;
+            }
+
+            // Light and fog in the photo's colours: sky above, horizon, ground.
+            var image = new Texture2D(2, 2);
+            image.LoadImage(File.ReadAllBytes(skyPath));
+            var above = Average(image, 0.70f, 0.95f);
+            var horizon = Average(image, 0.47f, 0.53f);
+            var below = Average(image, 0.10f, 0.40f);
+            Object.DestroyImmediate(image);
+            RenderSettings.ambientSkyColor = above;
+            RenderSettings.ambientEquatorColor = horizon;
+            RenderSettings.ambientGroundColor = below * 0.8f;
+            // Far fog in the horizon's colour hides where a drawn floor ends.
+            // The projected photo needs none (fog would grey out 3D props).
+            RenderSettings.fog = !useProjected;
+            RenderSettings.fogColor = horizon;
+            RenderSettings.fogStartDistance = 40f;
+            RenderSettings.fogEndDistance = GroundMetres / 2f;
+            return true;
+        }
+
+        // Average colour of a band of the photo (0 = bottom, 1 = top).
+        static Color Average(Texture2D image, float from, float to)
+        {
+            var sum = Color.black;
+            var count = 0;
+            for (var y = (int)(from * image.height); y < (int)(to * image.height); y += 16)
+            for (var x = 0; x < image.width; x += 16)
+            {
+                sum += image.GetPixel(x, y);
+                count++;
+            }
+            return count == 0 ? Color.gray : sum / count;
+        }
+
+        // Quest-friendly import settings: 2K floors, a 4K sky without mipmaps
+        // (they leave a seam at the photo's edge), normal maps marked as such,
+        // and the smoothness map read as data, not colour.
+        static Texture2D ImportTexture(string path, bool normalMap = false, bool sky = false, bool linear = false)
+        {
+            if (AssetImporter.GetAtPath(path) == null) AssetDatabase.ImportAsset(path);
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = normalMap ? TextureImporterType.NormalMap : TextureImporterType.Default;
+            importer.maxTextureSize = sky ? 4096 : 2048;
+            importer.mipmapEnabled = !sky;
+            importer.sRGBTexture = !normalMap && !linear;
+            importer.wrapModeU = TextureWrapMode.Repeat;
+            importer.wrapModeV = sky ? TextureWrapMode.Clamp : TextureWrapMode.Repeat;
+            if (linear) importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.SaveAndReimport();
+            return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+        }
+
+        // Falling rain over an area: thin streaks from 8 m up that reach the
+        // ground. perSquareMetre sets how heavy it is.
+        static void Rain(Transform parent, string name, Vector3 center, Vector2 size, float perSquareMetre)
+        {
+            var rain = new GameObject(name);
+            rain.transform.SetParent(parent, false);
+            rain.transform.localPosition = center + Vector3.up * 8f;
+            var particles = rain.AddComponent<ParticleSystem>();
+
+            var main = particles.main;
+            main.loop = true;
+            main.prewarm = true; // already raining when the world appears
+            main.startLifetime = 1.1f; // 8 m at 7.5 m/s
+            main.startSpeed = 0f;
+            main.startSize = 0.025f;
+            main.startColor = new Color(0.78f, 0.84f, 0.9f, 0.45f);
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 3000;
+
+            var emission = particles.emission;
+            emission.rateOverTime = size.x * size.y * perSquareMetre;
+
+            var shape = particles.shape;
+            shape.shapeType = ParticleSystemShapeType.Box;
+            shape.scale = new Vector3(size.x, 0.1f, size.y);
+
+            var velocity = particles.velocityOverLifetime;
+            velocity.enabled = true;
+            velocity.space = ParticleSystemSimulationSpace.World;
+            velocity.x = 0f;
+            velocity.y = -7.5f;
+            velocity.z = 0f;
+
+            var look = rain.GetComponent<ParticleSystemRenderer>();
+            look.renderMode = ParticleSystemRenderMode.Stretch; // streaks, not dots
+            look.velocityScale = 0.04f;
+            look.lengthScale = 1f;
+            look.sharedMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+                "Packages/com.unity.render-pipelines.universal/Runtime/Materials/ParticlesUnlit.mat");
         }
 
         static void AddZones(EnvironmentId environment, params Zone[] zones)
@@ -416,6 +605,16 @@ namespace XRPod.VR
                 var color = Color.Lerp(ZoneColor(zone.Type), Color.black, zone.Priority / 100f);
                 Paint(pad, $"Zone {ZoneTypes.ToWireName(zone.Type)} {zone.Priority}", color, 0.1f);
             }
+        }
+
+        // The round platform the user stands on in the rooms. Only a look:
+        // a flattened cylinder's own collider becomes a 2.5 m ball the user
+        // would stand on top of, and the floor under it already holds them.
+        static void Platform(Transform parent, string material, Color color)
+        {
+            var platform = Shape(PrimitiveType.Cylinder, "Platform", new Vector3(0f, 0.02f, 0f),
+                new Vector3(5f, 0.02f, 5f), parent, material, color);
+            Object.DestroyImmediate(platform.GetComponent<Collider>());
         }
 
         // Close, soft fog for the rooms: the floor fades into the sky.

@@ -82,7 +82,8 @@ Optional: **Unity OpenXR: Meta** adds Quest-specific features
 Then:
 
 1. In Package Manager, select **XR Interaction Toolkit → Samples** and
-   import **Starter Assets** and **XR Device Simulator**.
+   import **Starter Assets** (the XR Device Simulator is optional: our
+   desktop controls already work without a headset).
 2. **Project Settings → XR Plug-in Management**:
    - **Android** tab: tick **OpenXR**, then the **Meta Quest** feature group.
    - **Windows** tab: tick **OpenXR** too (for Quest Link testing later).
@@ -92,8 +93,15 @@ Then:
 4. **XR Plug-in Management → Project Validation**: click **Fix All**
    on both tabs. Repeat until it's clean.
 5. If Unity asks to enable the new Input System backend and restart, say yes.
+6. **XRPod → Set Up VR Player.** It adds the Starter Assets player (XR
+   Origin: head tracking, controllers, left stick moves, right stick turns,
+   point to teleport) to Bootstrap, puts our zone probe on its camera, and
+   turns off the desktop test player. WASD and the right mouse button
+   still move you in the Editor without a headset.
+7. **XRPod → Apply Quest Settings** (app id, 64-bit, Android version,
+   plain HTTP), then step 7 below.
 
-## 3. Bootstrap scene (never unloaded)
+## 3. Bootstrap scene by hand (only if not using the menus)
 
 **File → New Scene** (Basic URP), save as `Assets/XRPod/Scenes/Bootstrap.unity`.
 
@@ -186,14 +194,30 @@ Checklist:
    accept "Allow USB debugging" in the headset.
 2. **File → Build Profiles →** select **Meta Quest** (or **Android**) →
    **Switch Platform** (slow the first time).
-3. **Player Settings** (button in Build Profiles):
-   - Company/Product name; Package name e.g. `edu.csus.xrpod`
-   - **Other Settings → Allow downloads over HTTP: Always allowed**.
-     The Pi serves plain HTTP; Android blocks it otherwise.
+3. **Player Settings:** **XRPod → Apply Quest Settings** sets them (app
+   `edu.csus.xrpod`, 64-bit IL2CPP, Android 12L+, plain HTTP allowed,
+   which the Pi needs: Android blocks plain HTTP otherwise).
 4. Run **Project Validation** again and **Fix All**.
-5. **Disable the XR Device Simulator** object in Bootstrap.
+5. If you added the XR Device Simulator, **disable** it in Bootstrap.
 6. **Build And Run** with the headset selected as Run Device. The app shows
    up in the headset's Library under **Unknown Sources**.
+
+### Headset test checklist
+
+With the Pi (or the Pi software on a PC) on the same Wi-Fi as the headset:
+
+- [ ] The app opens in the waiting room; a line low in view says
+      "Connecting to the pod..." then "Connected to the pod" and hides
+- [ ] Picking a world in the HUD switches the headset within ~1 s, with a
+      fade; picking None goes back to the waiting room; Sponsor shows
+      "Coming soon"
+- [ ] Left stick walks, right stick turns, pointing a controller and
+      pressing teleports
+- [ ] Walking to the waves: the HUD shows `beach-shore`, then
+      `beach-waterline`; standing still for 30 s the dot stays green
+- [ ] Turning the Pi off: the headset says "Looking for the pod..."; on
+      again, it reconnects by itself
+- [ ] Frame rate is smooth (no stutter turning your head)
 
 ## 8. Connect to the Pi
 
@@ -207,8 +231,10 @@ the keyboard switches worlds.
      running here (`python pi/agent.py` from the repo root; the HUD is then
      at `http://localhost:8080`)
    - the real Pi: its address, e.g. `http://10.199.194.129` on Zainab's
-     hotspot (no port needed, the Pi uses 80). `xrpod.local` may not
-     resolve on the Quest.
+     hotspot (no port needed, the Pi uses 80). It doesn't have to be
+     right: with **Auto Find** on, if it doesn't answer, the headset looks
+     for the Pi on its Wi-Fi (`xrpod.local`, `10.42.0.1`, then every
+     address on the network) and remembers the one that worked.
 2. Drag the Http Pod Link component onto **Vr System Root → Pod Link**.
    (Empty Pod Link = offline.)
 3. **Edit → Project Settings → Player → Other Settings → Allow downloads
@@ -231,5 +257,7 @@ Scene view). Without one, the user starts at the scene's origin facing +Z.
 
 ## Not done yet
 
-- Changing the Pi's address in the headset without rebuilding the app.
+- Not yet tried on the Quest 3: the VR player menu, Quest settings, the
+  Pi search and the status line were written and compile, but only the
+  checklist above will tell.
 - Real environment art, sound and zone layouts.

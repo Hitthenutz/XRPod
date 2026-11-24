@@ -100,6 +100,26 @@ Suggested Pi behaviour:
   `zone_id` (target temperature, fan, humidity, scent; see `ZONES.md`) and
   applies it. `hardware.py`'s safety rules still apply.
 
+## 3. Live view: what the user sees
+
+So the researcher can watch along, the headset sends a small picture of
+the user's view about 4 times a second (`HeadsetLiveView`, added by
+`HttpPodLink` while connected):
+
+```http
+PUT /api/vr/frame
+Content-Type: application/json
+
+{"jpeg_base64": "/9j/4AAQ..."}
+```
+
+- A 640 x 360 JPEG, usually 20–60 KB. The Pi accepts only a real JPEG
+  under 150 KB (body up to 256 KB); every other write rule stays the same.
+- The Pi keeps only the newest picture, in memory, never on disk.
+- The HUD fetches `GET /api/vr/frame` a few times a second: `image/jpeg`,
+  or `204 No Content` when nothing came in the last 3 s.
+- Works offline on the pod's hotspot (Meta's casting needs the internet).
+
 ## Why HTTP polling to start with
 
 - The Pi already runs an HTTP server with validation, CSRF protection and
