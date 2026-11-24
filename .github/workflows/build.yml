@@ -40,7 +40,12 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Safety rules, validation, web server protections.
-      # Standard library only, so the runner's built-in Python is enough.
+      # Most of the Pi code is standard library only; the AI supervisor
+      # also needs pi/requirements.txt (pandas, joblib, scikit-learn).
+      - name: Install test and AI packages
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install pytest -r pi/requirements.txt
+
       - name: Test Pi controller
-        run: python3 -m unittest discover -s pi -v
+        run: .venv/bin/python -m pytest pi -q

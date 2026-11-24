@@ -39,7 +39,10 @@ import time
 from pathlib import Path
 
 import hardware
+from ai_controller import AIController
+from control_arbiter import ControlArbiter
 from datalog import EventWatcher
+from simulation_executor import SimulationExecutor
 from store import Store
 from vr import VrState
 from web import EventHub, start_server
@@ -54,6 +57,64 @@ CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "1"))
 REPEAT_ERROR_SECONDS = 60
 
 log = logging.getLogger("xrpod")
+
+
+class UnavailableModel:
+    """Stands in for the ML model when it can't load (e.g. pandas/joblib/
+    scikit-learn not installed), so the rest of the pod keeps running."""
+
+    def predict(self, reading):
+        return {"prediction": "UNKNOWN", "confidence": 0.0}
+
+
+def load_ml_model():
+    try:
+        from ml_inference import PhysicalEnvironmentModel  # needs pandas, joblib, scikit-learn
+        return PhysicalEnvironmentModel()
+    except Exception:
+        log.exception("ML model unavailable; AI status will show UNKNOWN")
+        return UnavailableModel()
+
+
+def run_ai(store, hub, vr, reading, settings, ai_controller, ml_model, arbiter, simulation_executor):
+    """Salma's AI supervisor: predict, recommend, arbitrate, and run the
+    decision in SIMULATION only (it never drives the real hardware yet).
+    Publishes the result to the HUD's AI status card."""
+    try:
+        physical_prediction = ml_model.predict(reading)
+    except Exception:
+        log.exception("ML inference failed")
+        physical_prediction = {"prediction": "UNKNOWN", "confidence": 0.0}
+
+    recommendation = ai_controller.recommend(settings=settings, reading=reading, vr_state=vr.latest())
+    decision = arbiter.resolve(settings=settings, recommendation=recommendation, reading=reading)
+
+    current_settings = store.get_settings()
+    if current_settings.get("control_mode") != settings.get("control_mode"):
+        simulation_result = simulation_executor.stop("Operating mode changed")
+    else:
+        simulation_result = simulation_executor.execute(
+            decision=decision, current_settings=current_settings, generation=arbiter.generation
+        )
+
+    hub.publish("ai", {
+        "active": recommendation.active,
+        "environment": recommendation.environment,
+        "zone": recommendation.zone,
+        "target_temp_f": recommendation.target_temp_f,
+        "fan_speed_pct": recommendation.fan_speed_pct,
+        "reason": recommendation.reason,
+        "control_mode": current_settings["control_mode"],
+        "physical_environment": physical_prediction["prediction"],
+        "model_confidence": physical_prediction["confidence"],
+        "control_source": decision.source,
+        "control_authorized": decision.authorized,
+        "control_reason": decision.reason,
+        "effective_settings": decision.settings,
+        "control_generation": arbiter.generation,
+        "execution_mode": "simulation",
+        "simulation": simulation_result,
+    })
 
 
 def log_event(store, hub, level, source, message):
@@ -79,11 +140,16 @@ def build_reading(settings, vr):
     }
 
 
-def control_loop(store, hub, wake, stop, vr):
+def control_loop(store, hub, wake, stop, vr, ai_controller=None, ml_model=None,
+                 arbiter=None, simulation_executor=None):
     """Read sensors, save and publish the reading, log what changed, and
     apply the latest settings. `wake` is set when settings change so the
     hardware reacts immediately."""
     watcher = EventWatcher()
+    ai_on = ai_controller is not None and arbiter is not None
+    if ai_on:
+        ml_model = ml_model or UnavailableModel()
+        simulation_executor = simulation_executor or SimulationExecutor()
     last_error, last_error_at = None, 0.0
     while not stop.is_set():
         try:
@@ -93,9 +159,13 @@ def control_loop(store, hub, wake, stop, vr):
             for level, source, message in watcher.check(raw, vr.latest(), hardware.take_node_errors()):
                 log_event(store, hub, level, source, message)
             hub.publish("reading", store.add_reading(raw))
+            if ai_on:
+                run_ai(store, hub, vr, raw, settings, ai_controller, ml_model, arbiter, simulation_executor)
         except Exception as err:
             # Keep controlling; a bad sensor read must not stop the loop.
             log.exception("control loop error")
+            if ai_on:
+                simulation_executor.stop("Control loop failure")
             text = f"Control loop error: {type(err).__name__}: {err}"
             if text != last_error or time.monotonic() - last_error_at > REPEAT_ERROR_SECONDS:
                 last_error, last_error_at = text, time.monotonic()
@@ -120,7 +190,11 @@ def main():
     hardware.setup()
     server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
     log_event(store, hub, "info", "pi", "Pi software started")
-    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr), name="control")
+    loop = threading.Thread(
+        target=control_loop,
+        args=(store, hub, wake, stop, vr, AIController(), load_ml_model(), ControlArbiter(), SimulationExecutor()),
+        name="control",
+    )
     loop.start()
 
     try:

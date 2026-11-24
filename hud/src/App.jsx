@@ -1,3 +1,5 @@
+import { AIStatusCard } from "@/components/AIStatusCard";
+import { useAIStatus } from "@/hooks/useAIStatus";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import { AirflowCard } from "@/components/AirflowCard";
 import { DataLogCard } from "@/components/DataLogCard";
@@ -12,6 +14,7 @@ import { usePodSettings } from "@/hooks/usePodSettings";
 export default function App() {
   const { settings, applyChanges, error, status } = usePodSettings();
   const { reading, loading: readingLoading } = useLatestReading();
+  const { aiStatus, connected } = useAIStatus();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -56,6 +59,7 @@ export default function App() {
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <SessionCard settings={settings} onChange={applyChanges} />
+            <AIStatusCard settings={settings} aiStatus={aiStatus} connected={connected}/>
             <VrLiveViewCard />
             {/* In auto mode the pod's control logic owns these, so lock them. */}
             <fieldset disabled={settings.control_mode === "auto"} className="hud-manual contents">
