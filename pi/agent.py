@@ -19,7 +19,8 @@ Settings (environment variables):
   HUD_PORT          port (default 8080)
   XRPOD_DB          database file (default xrpod.db next to this script)
   XRPOD_STATIC_DIR  built HUD (default ../hud/dist)
-  CONTROL_SECONDS   sensor/control loop interval (default 2)
+  CONTROL_SECONDS   sensor/control loop interval, and how often a reading is
+                    saved (default 1: the data log's 1 Hz)
   SCENT_HARDWARE    set to "mqtt" to talk to the ESP32 scent node
   FAN_HARDWARE      set to "mqtt" to talk to the ESP32 fan node
   MQTT_HOST         MQTT broker (default 127.0.0.1, Mosquitto on this Pi)
@@ -38,6 +39,7 @@ import time
 from pathlib import Path
 
 import hardware
+from datalog import EventWatcher
 from store import Store
 from vr import VrState
 from web import EventHub, start_server
@@ -47,22 +49,57 @@ HUD_HOST = os.environ.get("HUD_HOST", "0.0.0.0")  # noqa: S104 - LAN server by d
 HUD_PORT = int(os.environ.get("HUD_PORT", "8080"))
 DB_PATH = os.environ.get("XRPOD_DB", str(HERE / "xrpod.db"))
 STATIC_DIR = os.environ.get("XRPOD_STATIC_DIR", str(HERE.parent / "hud" / "dist"))
-CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "2"))
+CONTROL_SECONDS = float(os.environ.get("CONTROL_SECONDS", "1"))
+# The same control-loop error is logged as an event at most this often.
+REPEAT_ERROR_SECONDS = 60
 
 log = logging.getLogger("xrpod")
 
 
-def control_loop(store, hub, wake, stop):
-    """Read sensors, publish the reading, and apply the latest settings.
-    `wake` is set when settings change so the hardware reacts immediately."""
+def log_event(store, hub, level, source, message):
+    """Save an event and show it in the HUD straight away."""
+    try:
+        hub.publish("event", store.add_event(level, source, message))
+    except Exception:
+        log.exception("couldn't save event: %s", message)
+
+
+def build_reading(settings, vr):
+    """One reading for the data log: the sensors and actuator states, plus
+    the operating mode, the world picked and what the headset reports."""
+    state = vr.latest() or {}
+    connected = bool(state.get("connected"))
+    return {
+        **hardware.read_sensors(),
+        "control_mode": settings.get("control_mode"),
+        "selected_environment": settings.get("selected_environment"),
+        "vr_connected": connected,
+        "vr_environment": state.get("environment") if connected else None,
+        "vr_zone": state.get("zone_id") if connected else None,
+    }
+
+
+def control_loop(store, hub, wake, stop, vr):
+    """Read sensors, save and publish the reading, log what changed, and
+    apply the latest settings. `wake` is set when settings change so the
+    hardware reacts immediately."""
+    watcher = EventWatcher()
+    last_error, last_error_at = None, 0.0
     while not stop.is_set():
         try:
-            hardware.apply_settings(store.get_settings())
-            reading = store.add_reading(hardware.read_sensors())
-            hub.publish("reading", reading)
-        except Exception:
+            settings = store.get_settings()
+            hardware.apply_settings(settings)
+            raw = build_reading(settings, vr)
+            for level, source, message in watcher.check(raw, vr.latest(), hardware.take_node_errors()):
+                log_event(store, hub, level, source, message)
+            hub.publish("reading", store.add_reading(raw))
+        except Exception as err:
             # Keep controlling; a bad sensor read must not stop the loop.
             log.exception("control loop error")
+            text = f"Control loop error: {type(err).__name__}: {err}"
+            if text != last_error or time.monotonic() - last_error_at > REPEAT_ERROR_SECONDS:
+                last_error, last_error_at = text, time.monotonic()
+                log_event(store, hub, "error", "pi", text)
         wake.wait(CONTROL_SECONDS)
         wake.clear()
 
@@ -82,7 +119,8 @@ def main():
     vr = VrState()  # latest headset report; auto mode will read vr.latest()
     hardware.setup()
     server = start_server(store, hub, HUD_HOST, HUD_PORT, STATIC_DIR, on_settings_changed=wake.set, vr=vr)
-    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop), name="control")
+    log_event(store, hub, "info", "pi", "Pi software started")
+    loop = threading.Thread(target=control_loop, args=(store, hub, wake, stop, vr), name="control")
     loop.start()
 
     try:
@@ -97,6 +135,7 @@ def main():
         loop.join(timeout=5)
         server.shutdown()
         hardware.cleanup()
+        log_event(store, hub, "info", "pi", "Pi software stopped (all outputs off)")
         store.close()
 
 

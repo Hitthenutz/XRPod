@@ -1,5 +1,6 @@
 """
-XRPod data store: settings, sensor readings and change history in SQLite.
+XRPod data store: settings, sensor readings, change history, events
+(faults and status changes) and recording sessions in SQLite.
 
 Validation lives here too, so a bad
 request from any client (HUD, Unity, curl) is rejected before it can reach
@@ -67,10 +68,18 @@ HARDWARE_FIELDS = (
     "scent_intensity_pct",
 )
 
-# Keep the database small on the Pi's SD card.
+# Keep the database small on the Pi's SD card. Readings recorded during a
+# session are kept until the session is deleted, whatever their age.
 READING_RETENTION_SECONDS = 24 * 60 * 60
 HISTORY_MAX_ROWS = 5000
+EVENT_MAX_ROWS = 5000
 MAX_CHANGED_BY_LENGTH = 64
+
+# Events: what happened, how bad, and which part of the pod it was.
+EVENT_LEVELS = ("info", "warning", "error")
+MAX_EVENT_TEXT = 200
+MAX_SESSION_NAME = 64
+SESSION_LIST_LIMIT = 100
 
 
 class ValidationError(ValueError):
@@ -180,6 +189,23 @@ class Store:
                 new_value TEXT NOT NULL,
                 changed_by TEXT
             );
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_ts REAL NOT NULL,
+                created_date TEXT NOT NULL,
+                level TEXT NOT NULL,
+                source TEXT NOT NULL,
+                message TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS events_ts ON events (created_ts);
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                started_ts REAL NOT NULL,
+                started_date TEXT NOT NULL,
+                ended_ts REAL,
+                ended_date TEXT
+            );
             """
         )
         self._settings = self._load_settings()
@@ -280,10 +306,18 @@ class Store:
             self._readings_since_prune += 1
             if self._readings_since_prune >= 500:
                 self._readings_since_prune = 0
-                self._db.execute(
-                    "DELETE FROM readings WHERE created_ts < ?", (ts - READING_RETENTION_SECONDS,)
-                )
+                self._prune_readings(ts - READING_RETENTION_SECONDS)
         return {**reading, "id": str(cur.lastrowid), "created_date": created}
+
+    def _prune_readings(self, before_ts):
+        """Drop readings older than before_ts, except those recorded during a
+        session. Call with the lock held, inside a transaction."""
+        self._db.execute(
+            "DELETE FROM readings WHERE created_ts < ? AND NOT EXISTS ("
+            " SELECT 1 FROM sessions s WHERE readings.created_ts >= s.started_ts"
+            " AND (s.ended_ts IS NULL OR readings.created_ts <= s.ended_ts))",
+            (before_ts,),
+        )
 
     def get_latest_reading(self):
         with self._lock:
@@ -293,6 +327,161 @@ class Store:
         if row is None:
             return None
         return {**json.loads(row["data"]), "id": str(row["id"]), "created_date": row["created_date"]}
+
+    def readings_between(self, start_ts, end_ts):
+        """Readings from start_ts to end_ts (seconds since 1970), oldest
+        first, each with its created_date."""
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT created_date, data FROM readings WHERE created_ts >= ? AND created_ts <= ?"
+                " ORDER BY id",
+                (start_ts, end_ts),
+            ).fetchall()
+        return [{**json.loads(r["data"]), "created_date": r["created_date"]} for r in rows]
+
+    # ------------------------------------------------------------------ events
+    def add_event(self, level, source, message):
+        """Record something that happened (a node going offline, a fault,
+        the Pi starting). Returns the new row."""
+        if level not in EVENT_LEVELS:
+            raise ValidationError(f"level must be one of {', '.join(EVENT_LEVELS)}")
+        source = str(source)[:32] or "pi"
+        message = str(message)[:MAX_EVENT_TEXT]
+        ts = time.time()
+        created = now_iso()
+        with self._lock, self._db:
+            cur = self._db.execute(
+                "INSERT INTO events (created_ts, created_date, level, source, message) VALUES (?, ?, ?, ?, ?)",
+                (ts, created, level, source, message),
+            )
+            self._db.execute(
+                "DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?", (EVENT_MAX_ROWS,)
+            )
+        return {"id": str(cur.lastrowid), "created_date": created, "level": level,
+                "source": source, "message": message}
+
+    def get_events(self, limit=100, min_level="info"):
+        """Newest events first. min_level "warning" leaves out info."""
+        limit = max(1, min(500, int(limit)))
+        if min_level not in EVENT_LEVELS:
+            raise ValidationError(f"level must be one of {', '.join(EVENT_LEVELS)}")
+        levels = EVENT_LEVELS[EVENT_LEVELS.index(min_level):]
+        marks = ",".join("?" * len(levels))
+        with self._lock:
+            rows = self._db.execute(
+                f"SELECT id, created_date, level, source, message FROM events WHERE level IN ({marks})"  # noqa: S608 - only "?" marks
+                " ORDER BY id DESC LIMIT ?",
+                (*levels, limit),
+            ).fetchall()
+        return [{**dict(r), "id": str(r["id"])} for r in rows]
+
+    def events_between(self, start_ts, end_ts):
+        """Events and settings changes from start_ts to end_ts, oldest first,
+        as one list of {created_date, level, source, message}."""
+        start_iso = datetime.fromtimestamp(start_ts, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        end_iso = datetime.fromtimestamp(end_ts, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        with self._lock:
+            events = self._db.execute(
+                "SELECT created_date, level, source, message FROM events"
+                " WHERE created_ts >= ? AND created_ts <= ? ORDER BY id",
+                (start_ts, end_ts),
+            ).fetchall()
+            changes = self._db.execute(
+                "SELECT created_date, field_name, old_value, new_value, changed_by FROM change_log"
+                " WHERE created_date >= ? AND created_date <= ? ORDER BY id",
+                (start_iso, end_iso),
+            ).fetchall()
+        rows = [dict(e) for e in events]
+        for c in changes:
+            by = f" (by {c['changed_by']})" if c["changed_by"] else ""
+            rows.append({
+                "created_date": c["created_date"],
+                "level": "info",
+                "source": "settings",
+                "message": f"{c['field_name']}: {c['old_value']} -> {c['new_value']}{by}",
+            })
+        rows.sort(key=lambda r: r["created_date"])
+        return rows
+
+    # ---------------------------------------------------------------- sessions
+    def _session_view(self, row):
+        if row is None:
+            return None
+        end = row["ended_ts"] if row["ended_ts"] is not None else time.time()
+        with_counts = self._db.execute(
+            "SELECT COUNT(*) FROM readings WHERE created_ts >= ? AND created_ts <= ?",
+            (row["started_ts"], end),
+        ).fetchone()[0]
+        return {
+            "id": str(row["id"]),
+            "name": row["name"],
+            "started_date": row["started_date"],
+            "ended_date": row["ended_date"],
+            "recording": row["ended_ts"] is None,
+            "duration_s": round(end - row["started_ts"]),
+            "readings": with_counts,
+        }
+
+    def start_session(self, name=None):
+        """Start recording. Only one session records at a time."""
+        if name is not None and not isinstance(name, str):
+            raise ValidationError("name must be text")
+        name = (name or "").strip()[:MAX_SESSION_NAME]
+        with self._lock, self._db:
+            if self._db.execute("SELECT 1 FROM sessions WHERE ended_ts IS NULL").fetchone():
+                raise ValidationError("a session is already recording: stop it first")
+            ts, created = time.time(), now_iso()
+            cur = self._db.execute(
+                "INSERT INTO sessions (name, started_ts, started_date) VALUES (?, ?, ?)",
+                (name or f"Session {created[:16].replace('T', ' ')}", ts, created),
+            )
+            row = self._db.execute("SELECT * FROM sessions WHERE id = ?", (cur.lastrowid,)).fetchone()
+            return self._session_view(row)
+
+    def stop_session(self):
+        """Stop the session that's recording. Returns it."""
+        with self._lock, self._db:
+            row = self._db.execute("SELECT * FROM sessions WHERE ended_ts IS NULL").fetchone()
+            if row is None:
+                raise ValidationError("no session is recording")
+            self._db.execute(
+                "UPDATE sessions SET ended_ts = ?, ended_date = ? WHERE id = ?",
+                (time.time(), now_iso(), row["id"]),
+            )
+            row = self._db.execute("SELECT * FROM sessions WHERE id = ?", (row["id"],)).fetchone()
+            return self._session_view(row)
+
+    def get_sessions(self, limit=SESSION_LIST_LIMIT):
+        """Newest first, the recording one (if any) included."""
+        limit = max(1, min(SESSION_LIST_LIMIT, int(limit)))
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM sessions ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+            return [self._session_view(r) for r in rows]
+
+    def get_session_range(self, session_id):
+        """(name, start_ts, end_ts) of a session; end is now while it records."""
+        try:
+            session_id = int(session_id)
+        except (TypeError, ValueError) as err:
+            raise ValidationError("session must be a number") from err
+        with self._lock:
+            row = self._db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+        if row is None:
+            raise ValidationError("no such session")
+        end = row["ended_ts"] if row["ended_ts"] is not None else time.time()
+        return row["name"], row["started_ts"], end
+
+    def delete_session(self, session_id):
+        """Forget a stopped session; its readings then age out normally."""
+        name, _, _ = self.get_session_range(session_id)
+        with self._lock, self._db:
+            cur = self._db.execute(
+                "DELETE FROM sessions WHERE id = ? AND ended_ts IS NOT NULL", (int(session_id),)
+            )
+            if cur.rowcount == 0:
+                raise ValidationError("stop the session before deleting it")
+            self._prune_readings(time.time() - READING_RETENTION_SECONDS)
+        return name
 
     def close(self):
         with self._lock:

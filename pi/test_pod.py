@@ -19,10 +19,12 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+import datalog  # noqa: E402
 import fan  # noqa: E402
 import hardware  # noqa: E402
 import mqtt  # noqa: E402
 import scent  # noqa: E402
+import store as store_module  # noqa: E402
 from store import Store, ValidationError  # noqa: E402
 from vr import FRAME_STALE_SECONDS, MAX_FRAME_BYTES, STALE_SECONDS, VrFrame, VrState  # noqa: E402
 from web import EventHub, start_server  # noqa: E402
@@ -434,6 +436,145 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(self.store.get_latest_reading(), latest)
 
 
+class DataLogStoreTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.store = Store(os.path.join(self.tmp.name, "t.db"))
+
+    def tearDown(self):
+        self.store.close()
+        self.tmp.cleanup()
+
+    def test_events_newest_first_and_filtered_by_level(self):
+        self.store.add_event("info", "pi", "started")
+        self.store.add_event("warning", "scent", "Scent node went offline")
+        self.store.add_event("error", "pi", "boom")
+        self.assertEqual([e["message"] for e in self.store.get_events()],
+                         ["boom", "Scent node went offline", "started"])
+        self.assertEqual([e["level"] for e in self.store.get_events(min_level="warning")],
+                         ["error", "warning"])
+        with self.assertRaises(ValidationError):
+            self.store.add_event("panic", "pi", "x")
+        with self.assertRaises(ValidationError):
+            self.store.get_events(min_level="loud")
+
+    def test_event_text_is_capped(self):
+        e = self.store.add_event("info", "x" * 100, "m" * 1000)
+        self.assertEqual(len(e["source"]), 32)
+        self.assertEqual(len(e["message"]), store_module.MAX_EVENT_TEXT)
+
+    def test_session_start_stop_and_one_at_a_time(self):
+        s = self.store.start_session("Trial 1")
+        self.assertTrue(s["recording"])
+        self.assertEqual(s["name"], "Trial 1")
+        with self.assertRaises(ValidationError):
+            self.store.start_session("Trial 2")
+        self.store.add_reading({"actual_temp_f": 70.0})
+        done = self.store.stop_session()
+        self.assertFalse(done["recording"])
+        self.assertEqual(done["readings"], 1)
+        with self.assertRaises(ValidationError):
+            self.store.stop_session()
+        self.assertTrue(self.store.start_session()["name"].startswith("Session "))
+        with self.assertRaises(ValidationError):
+            self.store.start_session(5)
+
+    def test_session_readings_survive_pruning(self):
+        self.store.start_session("keep")
+        self.store.add_reading({"actual_temp_f": 70.0})
+        self.store.stop_session()
+        # Pretend everything is two days old, then prune.
+        with self.store._db:
+            self.store._db.execute("UPDATE readings SET created_ts = created_ts - 172800")
+            self.store._db.execute("UPDATE sessions SET started_ts = started_ts - 172800,"
+                                   " ended_ts = ended_ts - 172800")
+            self.store._db.execute("INSERT INTO readings (created_ts, created_date, data)"
+                                   " VALUES (1, '1970-01-01T00:00:01Z', '{}')")
+            self.store._prune_readings(store_module.time.time() - 3600)
+        count = self.store._db.execute("SELECT COUNT(*) FROM readings").fetchone()[0]
+        self.assertEqual(count, 1)  # the session's reading stayed, the old loose one went
+
+    def test_delete_session(self):
+        s = self.store.start_session("gone")
+        with self.assertRaises(ValidationError):
+            self.store.delete_session(s["id"])  # still recording
+        self.store.stop_session()
+        self.assertEqual(self.store.delete_session(s["id"]), "gone")
+        self.assertEqual(self.store.get_sessions(), [])
+        with self.assertRaises(ValidationError):
+            self.store.delete_session("abc")
+
+    def test_events_between_includes_settings_changes(self):
+        start = store_module.time.time() - 1
+        self.store.add_event("warning", "fan", "Fan node went offline")
+        self.store.update_settings({"fan_speed_pct": 40}, changed_by="10.42.0.5")
+        rows = self.store.events_between(start, store_module.time.time() + 1)
+        self.assertEqual([r["source"] for r in rows], ["fan", "settings"])
+        self.assertEqual(rows[1]["message"], "fan_speed_pct: 0 -> 40 (by 10.42.0.5)")
+
+
+class DataLogTests(unittest.TestCase):
+    def reading(self, **over):
+        base = {"scent_node": "online", "fan_node": "online", "iaq": {"temp_c": 22},
+                "heater_running": False, "ac_running": False, "scent_active": "none"}
+        return {**base, **over}
+
+    def test_first_reading_only_reports_problems(self):
+        w = datalog.EventWatcher()
+        self.assertEqual(w.check(self.reading()), [])
+        w = datalog.EventWatcher()
+        self.assertEqual(w.check(self.reading(fan_node="offline")),
+                         [("warning", "fan", "Fan node is offline")])
+
+    def test_changes_become_events(self):
+        w = datalog.EventWatcher()
+        w.check(self.reading(), {"connected": True, "environment": "beach"})
+        events = w.check(self.reading(scent_node="offline", iaq=None, heater_running=True,
+                                      scent_active="pine"), {"connected": False},
+                         node_errors=[("fan", "bad_json")])
+        texts = [e[2] for e in events]
+        self.assertIn("Scent node went offline (its outputs turn off)", texts)
+        self.assertIn("Fan node reported: bad_json", texts)
+        self.assertIn("BME688 sensor stopped reporting (temperature and humidity are simulated)", texts)
+        self.assertIn("Headset disconnected", texts)
+        self.assertIn("Heater on", texts)
+        self.assertIn("Scent now pine", texts)
+        # Nothing changed: nothing new.
+        self.assertEqual(w.check(self.reading(scent_node="offline", iaq=None, heater_running=True,
+                                              scent_active="pine"), {"connected": False}), [])
+
+    def test_stub_nodes_are_quiet(self):
+        w = datalog.EventWatcher()
+        w.check(self.reading(scent_node="stub", fan_node="stub"))
+        self.assertEqual(w.check(self.reading(scent_node="stub", fan_node="stub")), [])
+
+    def test_readings_csv_columns_and_flattening(self):
+        text = datalog.readings_csv([
+            {"created_date": "2026-11-24T10:00:00Z", "control_mode": "manual",
+             "actual_temp_f": 70.5, "heater_running": False, "iaq": {"gas_kohm": 80}, "id": "1"},
+            {"created_date": "2026-11-24T10:00:01Z", "control_mode": "auto", "iaq": None, "new_field": 3},
+        ])
+        lines = text.strip().split("\n")
+        header = lines[0].split(",")
+        self.assertEqual(header[:3], ["created_date", "control_mode", "selected_environment"])
+        self.assertIn("iaq_gas_kohm", header)
+        self.assertIn("new_field", header)
+        self.assertNotIn("id", header)
+        first = dict(zip(header, lines[1].split(",")))
+        self.assertEqual(first["actual_temp_f"], "70.5")
+        self.assertEqual(first["heater_running"], "false")
+        self.assertEqual(first["iaq_gas_kohm"], "80")
+
+    def test_csv_defuses_spreadsheet_formulas(self):
+        text = datalog.events_csv([{"created_date": "d", "level": "info", "source": "log",
+                                    "message": "=HYPERLINK(\"x\")"}])
+        self.assertIn("'=HYPERLINK", text)
+
+    def test_file_name_is_safe(self):
+        self.assertEqual(datalog.file_name('session-3-Trial "A"/../x', "readings"),
+                         "xrpod-session-3-trial-a-x-readings.csv")
+
+
 class VrStateTests(unittest.TestCase):
     def setUp(self):
         self.now = 1000.0
@@ -662,6 +803,47 @@ class WebTests(unittest.TestCase):
                 self.assertEqual(resp.status, 204)
         finally:
             server.shutdown()
+
+    def put_session(self, msg, **headers):
+        return self.request("PUT", "/api/log/session", json.dumps(msg),
+                            {"Content-Type": "application/json", **headers})
+
+    def test_data_log_session_and_csv(self):
+        self.put_session({"action": "stop"})  # in case another test left one running
+        status, body = self.put_session({"action": "start", "name": "Web trial"})
+        self.assertEqual(status, 200)
+        session = json.loads(body)["session"]
+        self.assertTrue(session["recording"])
+        self.assertEqual(self.put_session({"action": "start"})[0], 400)  # one at a time
+        self.store.add_reading({"actual_temp_f": 70.0, "control_mode": "manual"})
+        self.assertEqual(self.put_session({"action": "stop"})[0], 200)
+
+        req = urllib.request.Request(f"{self.base}/api/log/readings.csv?session={session['id']}")  # noqa: S310
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
+            self.assertTrue(resp.headers["Content-Type"].startswith("text/csv"))
+            self.assertIn("attachment", resp.headers["Content-Disposition"])
+            text = resp.read().decode()
+        self.assertTrue(text.startswith("created_date,control_mode"))
+        self.assertIn("70.0", text)
+
+        status, text = self.request("GET", "/api/log/events.csv?minutes=5")
+        self.assertEqual(status, 200)
+        self.assertIn("Recording started: Web trial", text)
+        status, body = self.request("GET", "/api/log/events?level=info&limit=5")
+        self.assertEqual(status, 200)
+        self.assertTrue(any("Recording stopped" in e["message"] for e in json.loads(body)))
+        status, body = self.request("GET", "/api/log/sessions")
+        self.assertIn("Web trial", body)
+
+    def test_data_log_rejects_bad_requests(self):
+        self.assertEqual(self.put_session({"action": "explode"})[0], 400)
+        self.assertEqual(self.put_session({"action": "start", "extra": 1})[0], 400)
+        self.assertEqual(self.put_session({"action": "start"}, Origin="http://evil.example")[0], 403)
+        self.assertEqual(self.request("GET", "/api/log/readings.csv?minutes=0")[0], 400)
+        self.assertEqual(self.request("GET", "/api/log/readings.csv?minutes=abc")[0], 400)
+        self.assertEqual(self.request("GET", "/api/log/readings.csv?session=999")[0], 400)
+        self.assertEqual(self.request("GET", "/api/log/events?level=loud")[0], 400)
+        self.assertEqual(self.request("GET", "/api/log/nope")[0], 404)
 
     def test_read_endpoints(self):
         self.assertEqual(self.request("GET", "/api/settings")[0], 200)

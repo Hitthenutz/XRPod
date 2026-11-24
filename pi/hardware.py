@@ -64,6 +64,18 @@ def cleanup():
     log.info("hardware: all outputs off")
 
 
+def take_node_errors():
+    """Errors the ESP32 nodes reported since the last call, as
+    [(source, message)], for the data log. Each is returned once."""
+    errors = []
+    for source, node in (("scent", scent_machine), ("fan", fan_node)):
+        message = getattr(node, "last_error", None)
+        if message:
+            node.last_error = None
+            errors.append((source, message))
+    return errors
+
+
 # --------------------------------------------------------------------------
 # Sensors (STUB)
 # --------------------------------------------------------------------------
