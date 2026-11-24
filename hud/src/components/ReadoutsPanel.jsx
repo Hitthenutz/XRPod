@@ -45,10 +45,19 @@ function RunningPill({ icon: Icon, label, running, color }) {
 const fmt = (n, digits = 1) =>
   typeof n === "number" && Number.isFinite(n) ? n.toFixed(digits) : "--";
 
+// Where temperature and humidity come from: the BME688 (IAQ node) when it's
+// reporting, otherwise the Pi's made-up test values (pi/hardware.py).
+function climateSource(reading) {
+  if (reading?.climate_source === "bme688") return "BME688 sensor";
+  if (reading?.climate_source === "simulated") return "Simulated (no sensor)";
+  return null;
+}
+
 export function ReadoutsPanel({ reading, loading }) {
   const now = useNow(5000);
   const lastAt = reading?.created_date ? new Date(reading.created_date).getTime() : null;
   const stale = !lastAt || now - lastAt > STALE_AFTER_MS;
+  const source = climateSource(reading);
 
   return (
     <section aria-label="Live readouts" className="space-y-3">
@@ -76,12 +85,14 @@ export function ReadoutsPanel({ reading, loading }) {
           label="Temperature"
           value={fmt(reading?.actual_temp_f)}
           unit="°F"
+          sub={source}
         />
         <Stat
           icon={Droplets}
           label="Humidity"
           value={fmt(reading?.actual_humidity_pct, 0)}
           unit="%"
+          sub={source}
         />
       </div>
 
