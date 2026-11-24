@@ -78,13 +78,22 @@ def read_sensors():
     fake_humidity = 45.0 + random.uniform(-3, 3)  # noqa: S311
     fake_rpm = state["fan_pct"] * 30 + random.uniform(-20, 20) if state["fan_pct"] else 0  # noqa: S311
 
+    # The BME688 (IAQ node, xrpod/iaq/reading) replaces the fake temperature
+    # and humidity whenever it has sent a fresh reading.
+    scent = scent_machine.status() if scent_machine else {"scent_active": "none"}
+    iaq = scent.get("iaq") or {}
+    temp_c, humidity = iaq.get("temp_c"), iaq.get("humidity_pct")
+    real = temp_c is not None and humidity is not None
+    temp_f = temp_c * 9 / 5 + 32 if real else fake_temp_f
+
     return {
-        "actual_temp_f": round(fake_temp_f, 1),
-        "actual_humidity_pct": round(fake_humidity, 1),
+        "actual_temp_f": round(temp_f, 1),
+        "actual_humidity_pct": round(humidity if real else fake_humidity, 1),
+        "climate_source": "bme688" if real else "simulated",
         "ac_running": state["ac_running"],
         "heater_running": state["heater_running"],
         **(fan_node.status(max(0, round(fake_rpm))) if fan_node else {"fan_rpm": 0}),
-        **(scent_machine.status() if scent_machine else {"scent_active": "none"}),
+        **scent,
     }
 
 # --------------------------------------------------------------------------
