@@ -80,6 +80,19 @@ class HardwareTests(unittest.TestCase):
         self.assertFalse(hardware.state["heater_running"])
         self.assertFalse(hardware.state["ac_running"])
 
+    def test_readings_use_the_bme688_when_it_reports(self):
+        reading = hardware.read_sensors()
+        self.assertEqual(reading["climate_source"], "simulated")
+        hardware.scent_machine.on_message(
+            "xrpod/iaq/reading", b'{"temp_c": 25.0, "humidity_pct": 52.3, "gas_kohm": 80}')
+        reading = hardware.read_sensors()
+        self.assertEqual(reading["climate_source"], "bme688")
+        self.assertEqual(reading["actual_temp_f"], 77.0)
+        self.assertEqual(reading["actual_humidity_pct"], 52.3)
+        # A reading without temperature or humidity isn't enough.
+        hardware.scent_machine.on_message("xrpod/iaq/reading", b'{"gas_kohm": 80}')
+        self.assertEqual(hardware.read_sensors()["climate_source"], "simulated")
+
     def test_junk_settings_mean_off(self):
         hardware.apply_settings({"heater_on": "yes", "fan_speed_pct": "x",
                                  "selected_scent": 7, "scent_intensity_pct": None})
