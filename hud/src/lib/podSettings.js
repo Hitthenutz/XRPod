@@ -1,4 +1,5 @@
-export const SCENTS = ["none", "lavender", "pine", "citrus"]; // must match the scent nodeexport const FAN_LEVELS = [0, 25, 50, 75, 100];
+export const SCENTS = ["none", "lavender", "pine", "citrus"]; // must match the scent node
+export const FAN_LEVELS = [0, 25, 50, 75, 100];
 // Mirror CONTROL_MODES and ENVIRONMENTS in pi/store.py.
 export const CONTROL_MODES = ["manual", "auto"];
 export const ENVIRONMENTS = ["none", "beach", "forest", "desert", "sponsor"];
