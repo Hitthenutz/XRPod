@@ -5,6 +5,7 @@ import { ReadoutsPanel } from "@/components/ReadoutsPanel";
 import { ScentCard } from "@/components/ScentCard";
 import { SessionCard } from "@/components/SessionCard";
 import { TemperatureCard } from "@/components/TemperatureCard";
+import { VrLiveViewCard } from "@/components/VrLiveViewCard";
 import { useLatestReading } from "@/hooks/useLatestReading";
 import { usePodSettings } from "@/hooks/usePodSettings";
 
@@ -55,6 +56,7 @@ export default function App() {
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <SessionCard settings={settings} onChange={applyChanges} />
+            <VrLiveViewCard />
             {/* In auto mode the pod's control logic owns these, so lock them. */}
             <fieldset disabled={settings.control_mode === "auto"} className="hud-manual contents">
               <TemperatureCard settings={settings} onChange={applyChanges} />
