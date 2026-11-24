@@ -474,11 +474,16 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(by_field["selected_scent"]["changed_by"], "1.2.3.4")
 
     def test_settings_survive_restart(self):
-        self.store.update_settings({"selected_scent": "ocean"})
+        self.store.update_settings({"selected_scent": "citrus"})
         self.store.close()
         self.store = Store(os.path.join(self.tmp.name, "t.db"))
-        self.assertEqual(self.store.get_settings()["selected_scent"], "ocean")
+        self.assertEqual(self.store.get_settings()["selected_scent"], "citrus")
 
+    def test_only_the_scent_nodes_scents(self):
+        for name in ("ocean", "rain"):  # the node has lavender, pine and citrus only
+            with self.assertRaises(ValidationError):
+                self.store.update_settings({"selected_scent": name})
+                
     def test_readings(self):
         self.assertIsNone(self.store.get_latest_reading())
         self.store.add_reading({"actual_temp_f": 70.0})
