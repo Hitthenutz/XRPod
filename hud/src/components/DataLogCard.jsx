@@ -11,8 +11,19 @@ import {
 } from "lucide-react";
 import { logCsvUrl } from "@/api/pod";
 import { Card } from "@/components/ui/Card";
+import { useChangeLog } from "@/hooks/useChangeLog";
 import { useDataLog } from "@/hooks/useDataLog";
+import { FIELD_LABELS, formatFieldValue } from "@/lib/podSettings";
 import { timeAgo, useNow } from "@/lib/time";
+
+// A settings change (the old History card) as a log line.
+const settingsEvent = (c) => ({
+  id: `s${c.id}`,
+  created_date: c.created_date,
+  level: "info",
+  source: c.changed_by ? `settings · ${c.changed_by}` : "settings",
+  message: `${FIELD_LABELS[c.field_name] ?? c.field_name}: ${formatFieldValue(c.field_name, c.old_value)} → ${formatFieldValue(c.field_name, c.new_value)}`,
+});
 
 const LEVEL_STYLE = {
   info: { icon: Info, tone: "text-slate-400" },
@@ -100,7 +111,7 @@ function EventList({ events, now, empty }) {
             <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${style.tone}`} aria-label={e.level} />
             <div className="min-w-0 flex-1">
               <div className="text-slate-200">{e.message}</div>
-              <div className="text-xs uppercase tracking-wider text-slate-500">{e.source}</div>
+              <div className="text-xs tracking-wider text-slate-500">{e.source}</div>
             </div>
             <time
               dateTime={e.created_date}
@@ -122,10 +133,15 @@ function EventList({ events, now, empty }) {
  */
 export function DataLogCard() {
   const { events, sessions, recording, loading, error, start, stop, remove } = useDataLog();
+  const { entries: changes } = useChangeLog(50);
   const [tab, setTab] = useState("activity");
   const now = useNow(1000);
   const problems = events.filter((e) => e.level !== "info");
-  const shown = tab === "problems" ? problems : events;
+  // Activity: pod events and settings changes together, newest first.
+  const activity = [...events, ...changes.map(settingsEvent)].sort((a, b) =>
+    b.created_date.localeCompare(a.created_date),
+  );
+  const shown = tab === "problems" ? problems : activity;
   const past = sessions.filter((s) => !s.recording).slice(0, 5);
 
   const tabClass = (name) =>
