@@ -245,7 +245,8 @@ class MqttClient:
             # Ping if we have not sent OR not heard anything for a while. The Pi
             # resends commands every few seconds, so checking only "sent" never
             # pinged, heard nothing back, and dropped a healthy broker.
-            if now - min(self._last_sent, self._last_heard) >= self.keepalive / 2:self._send(packet(PINGREQ, 0))
+            if now - min(self._last_sent, self._last_heard) >= self.keepalive / 2:
+                self._send(packet(PINGREQ, 0))
             if now - self._last_heard > self.keepalive * 1.5:
                 raise ProtocolError("broker stopped answering")
             try:
