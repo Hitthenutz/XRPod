@@ -5,12 +5,13 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { Card } from "@/components/ui/Card";
 
 function InfoTile({ label, value }) {
   return (
-    <div className="rounded-xl bg-slate-800 p-3">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="mt-1 font-semibold">{value}</p>
+    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+      <p className="text-xs uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 font-semibold text-slate-100">{value}</p>
     </div>
   );
 }
@@ -40,26 +41,21 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
   const simulationAccepted = simulation?.accepted === true;
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-      <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <BrainCircuit className="h-6 w-6 text-sky-400" />
-          <div>
-            <h2 className="text-lg font-semibold">
-              XRPOD AI Supervisor
-            </h2>
-            <p className="text-xs text-slate-400">
-              Environment-aware AI monitoring and simulation
-            </p>
-          </div>
-        </div>
-
-        {connected ? (
-          <Wifi className="h-5 w-5 text-emerald-400" />
+    <Card
+      title="AI Supervisor"
+      icon={BrainCircuit}
+      className="md:col-span-2"
+      action={
+        connected ? (
+          <Wifi className="h-4 w-4 text-emerald-400" aria-label="AI connected" />
         ) : (
-          <WifiOff className="h-5 w-5 text-amber-400" />
-        )}
-      </div>
+          <WifiOff className="h-4 w-4 text-amber-400" aria-label="AI not connected" />
+        )
+      }
+    >
+      <p className="-mt-2 mb-4 text-xs text-slate-400">
+        Environment-aware AI monitoring and simulation
+      </p>
 
       <div className="mb-5 flex flex-wrap gap-2">
         <span className="rounded-full bg-sky-500/20 px-3 py-1 text-xs font-semibold text-sky-300">
@@ -261,6 +257,6 @@ export function AIStatusCard({ settings, aiStatus, connected }) {
         <ShieldCheck className="h-4 w-4" />
         Simulation only — no AI commands applied to physical hardware
       </div>
-    </section>
+    </Card>
   );
 }
