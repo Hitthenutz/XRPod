@@ -28,8 +28,8 @@ constexpr uint32_t kDutyWindowMs = 10000;     // intensity cycle length
 constexpr uint32_t kCommandTimeoutMs = 15000; // Pi must resend within this
 
 // ---- BME688 (I2C) -----------------------------------------------------------
-constexpr uint8_t kI2cSda = 21;
-constexpr uint8_t kI2cScl = 22;
+constexpr uint8_t kI2cSda = 8;
+constexpr uint8_t kI2cScl = 9;
 constexpr uint8_t kBmeAddress = 0x77;  // 0x76 if SDO is tied to GND
 constexpr uint32_t kSensorPeriodMs = 3000;
 constexpr uint16_t kGasHeaterC = 320;
