@@ -59,12 +59,12 @@ export default function App() {
         {settings ? (
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             <SessionCard settings={settings} onChange={applyChanges} />
-            <AIStatusCard settings={settings} aiStatus={aiStatus} connected={connected}/>
             <VrLiveViewCard />
+            <AIStatusCard settings={settings} aiStatus={aiStatus} connected={connected}/>
             {/* In auto mode the pod's control logic owns these, so lock them. */}
             <fieldset disabled={settings.control_mode === "auto"} className="hud-manual contents">
-              <TemperatureCard settings={settings} onChange={applyChanges} />
-              <AirflowCard settings={settings} onChange={applyChanges} />
+              <TemperatureCard settings={settings} reading={reading} onChange={applyChanges} />              
+              <AirflowCard settings={settings} reading={reading} onChange={applyChanges} />              
               <ScentCard settings={settings} onChange={applyChanges} />
             </fieldset>
             <DataLogCard />
