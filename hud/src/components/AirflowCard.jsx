@@ -1,9 +1,10 @@
 import { Wind } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { LevelButtons } from "@/components/ui/LevelButtons";
 import { Slider } from "@/components/ui/Slider";
-import { FAN_LEVELS } from "@/lib/podSettings";
+import { FAN_LEVELS, HUMIDITY_LEVELS } from "@/lib/podSettings";
 
-export function AirflowCard({ settings, reading, onChange }) {  
+export function AirflowCard({ settings, reading, onChange }) {
   return (
     <Card title="Humidity & airflow" icon={Wind}>
       <div className="space-y-5">
@@ -14,7 +15,15 @@ export function AirflowCard({ settings, reading, onChange }) {
           accent="teal"
           onCommit={(v) => onChange({ target_humidity_pct: v })}
         />
-      <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5">
+        <LevelButtons
+          label="Humidity level"
+          levels={HUMIDITY_LEVELS}
+          value={settings.target_humidity_pct}
+          unit="%"
+          accent="teal"
+          onSelect={(v) => onChange({ target_humidity_pct: v })}
+        />
+        <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-2.5">
           <span className="text-xs uppercase tracking-wider text-slate-400">Live humidity</span>
           <span className="font-mono text-sm tabular-nums text-slate-200">
             {typeof reading?.actual_humidity_pct === "number" ? `${Math.round(reading.actual_humidity_pct)}%` : "--"}

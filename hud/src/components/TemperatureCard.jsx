@@ -1,10 +1,12 @@
 import { Flame, Snowflake, Thermometer } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { LevelButtons } from "@/components/ui/LevelButtons";
 import { Slider } from "@/components/ui/Slider";
 import { Toggle } from "@/components/ui/Toggle";
+import { TEMP_LEVELS } from "@/lib/podSettings";
 
 export function TemperatureCard({ settings, reading, onChange }) {
-    return (
+  return (
     <Card title="Temperature" icon={Thermometer}>
       <div className="space-y-5">
         <Slider
@@ -15,6 +17,14 @@ export function TemperatureCard({ settings, reading, onChange }) {
           unit="°F"
           accent="orange"
           onCommit={(v) => onChange({ target_temp_f: v })}
+        />
+        <LevelButtons
+          label="Temperature level"
+          levels={TEMP_LEVELS}
+          value={settings.target_temp_f}
+          unit="°"
+          accent="orange"
+          onSelect={(v) => onChange({ target_temp_f: v })}
         />
         {/* Heater and AC are mutually exclusive: turning one on turns the other off. */}
         <div className="flex flex-col gap-3 sm:flex-row">
